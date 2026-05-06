@@ -583,6 +583,7 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
   bool _isLocked = false;
+  bool _isDataReady = false;
   Offset? _fabOffset;
   bool _isDraggingFab = false;
 
@@ -596,9 +597,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       await _loadInitialData();
       if (!mounted) return;
       final settings = context.read<SettingsProvider>();
-      if (settings.hasAppLock && settings.lockOnLaunch) {
-        setState(() => _isLocked = true);
-      }
+      setState(() {
+        _isDataReady = true;
+        _isLocked = settings.hasAppLock && settings.lockOnLaunch;
+      });
     });
   }
 
@@ -696,6 +698,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         disableAppLock: settings.disableAppLock,
         onUnlocked: () => setState(() => _isLocked = false),
       );
+    }
+    // While loading, show blank screen to prevent data exposure before lock check
+    if (!_isDataReady) {
+      final theme = Theme.of(context);
+      return Scaffold(backgroundColor: theme.scaffoldBackgroundColor);
     }
     return Scaffold(
       body: LayoutBuilder(
