@@ -327,6 +327,44 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
     );
   }
 
+  Future<void> _saveSecurity({bool? lockOnLaunch, bool? biometric}) async {
+    try {
+      await context.read<SettingsProvider>().updateSecurity(
+        lockOnLaunch: lockOnLaunch,
+        biometric: biometric,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(content: Text('설정 저장에 실패했습니다. 다시 시도해 주세요.')),
+      );
+    }
+  }
+
+  Future<void> _onLockOnLaunchChanged(bool value) async {
+    if (value) {
+      if (context.read<SettingsProvider>().hasAppLock) {
+        await _saveSecurity(lockOnLaunch: true);
+      } else {
+        await _showPinSetup();
+      }
+    } else {
+      await _saveSecurity(lockOnLaunch: false);
+    }
+  }
+
+  Future<void> _onBiometricChanged(bool value) async {
+    if (value && !context.read<SettingsProvider>().hasAppLock) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(
+          content: Text('생체 인증을 사용하려면 먼저 앱 잠금 PIN을 설정하세요.'),
+        ),
+      );
+      return;
+    }
+    await _saveSecurity(biometric: value);
+  }
+
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
@@ -338,41 +376,18 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
           title: '앱 실행 잠금',
           subtitle: '앱을 열 때 비밀번호나 생체 인증을 사용해요.',
           value: settings.lockOnLaunch,
-          onChanged: (value) {
-            if (value) {
-              if (settings.hasAppLock) {
-                context.read<SettingsProvider>().updateSecurity(
-                  lockOnLaunch: true,
-                );
-              } else {
-                _showPinSetup();
-              }
-            } else {
-              context.read<SettingsProvider>().updateSecurity(
-                lockOnLaunch: false,
-              );
-            }
-          },
+          onChanged: _onLockOnLaunchChanged,
         ),
         _SwitchCard(
           title: '생체 인증 사용',
           subtitle: 'Face ID 또는 지문 인증을 사용해요.',
           value: settings.biometric,
-          onChanged: (value) {
-            if (value && !settings.hasAppLock) {
-              ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-                const SnackBar(
-                  content: Text('생체 인증을 사용하려면 먼저 앱 잠금 PIN을 설정하세요.'),
-                ),
-              );
-              return;
-            }
-            context.read<SettingsProvider>().updateSecurity(biometric: value);
-          },
+          onChanged: _onBiometricChanged,
         ),
       ],
     );
-  }}
+  }
+}
 
 class HelpCenterScreen extends StatelessWidget {
   const HelpCenterScreen({super.key});

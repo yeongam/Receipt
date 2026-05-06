@@ -377,12 +377,21 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   Future<void> updateSecurity({bool? lockOnLaunch, bool? biometric}) async {
+    final prevLockOnLaunch = _lockOnLaunch;
+    final prevBiometric = _biometric;
     if (lockOnLaunch != null) _lockOnLaunch = lockOnLaunch;
     if (biometric != null) _biometric = biometric;
     notifyListeners();
     return _queueWork(() async {
-      await _persist();
-      await _persistUserProfile();
+      try {
+        await _persist();
+        await _persistUserProfile();
+      } catch (e) {
+        _lockOnLaunch = prevLockOnLaunch;
+        _biometric = prevBiometric;
+        notifyListeners();
+        rethrow;
+      }
     });
   }
 

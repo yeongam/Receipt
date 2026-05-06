@@ -645,10 +645,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       }
       if (!mounted) return;
       final settings = context.read<SettingsProvider>();
+      final isLocked = settings.hasAppLock && settings.lockOnLaunch;
       setState(() {
         _isDataReady = true;
-        _isLocked = settings.hasAppLock && settings.lockOnLaunch;
+        _isLocked = isLocked;
       });
+      // Notification permission popup must not appear before the lock gate.
+      if (!isLocked) _initNotificationService();
     });
   }
 
@@ -681,9 +684,25 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
     if (!mounted) return;
 
-    // Initialize notification service and sync schedules
+    // Initialize the notification plugin (no OS popup — permission is
+    // requested later, after the lock gate is resolved).
+    await NotificationService.instance.initialize();
+
+    if (!mounted) return;
+    setState(() {
+      _currentIndex = SettingsProvider.navigationIndexFor(
+        settingsProvider.startScreen,
+      );
+    });
+  }
+
+  /// Requests notification permission and syncs schedules.
+  /// Called only after the app lock gate is resolved to avoid showing
+  /// an OS permission popup before the lock screen.
+  Future<void> _initNotificationService() async {
+    if (!mounted) return;
+    final settingsProvider = context.read<SettingsProvider>();
     final notificationService = NotificationService.instance;
-    await notificationService.initialize();
     final granted = await notificationService.requestPermissions();
     if (granted && mounted) {
       final notificationSetting = settingsProvider.notificationSetting;
@@ -696,13 +715,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         );
       }
     }
-
-    if (!mounted) return;
-    setState(() {
-      _currentIndex = SettingsProvider.navigationIndexFor(
-        settingsProvider.startScreen,
-      );
-    });
   }
 
   final List<Widget> _screens = const [
@@ -749,7 +761,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         validatePin: settings.validateAppLockPasscode,
         validateRecoveryCode: settings.validateRecoveryCodeForUnlock,
         disableAppLock: settings.disableAppLock,
-        onUnlocked: () => setState(() => _isLocked = false),
+        onUnlocked: () {
+          setState(() => _isLocked = false);
+          _initNotificationService();
+        },
         biometricEnabled: settings.biometric,
       );
     }
