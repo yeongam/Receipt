@@ -1,0 +1,50 @@
+name: integrated_expense
+description: 통합 지출관리 — 텐텐 팀 프로젝트
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.10.3 <4.0.0'
+  flutter: '>=3.38.4'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # ── Supabase ────────────────────────────────────────────────────
+  supabase_flutter: ^2.8.4
+
+  # ── State Management ───────────────────────────────────────────
+  provider: ^6.1.2
+
+  # ── Utils ──────────────────────────────────────────────────────
+  intl: ^0.20.2            # 날짜/통화 포맷
+
+  # ── Chart ──────────────────────────────────────────────────────
+  fl_chart: ^0.69.0        # 리포트 도넛/바 차트
+
+  # ── Secure Storage ─────────────────────────────────────────────
+  flutter_secure_storage: ^9.2.4
+
+  # ── Authentication & Security ──────────────────────────────────
+  local_auth: ^2.3.0
+  crypto: ^3.0.6
+
+  # ── Notifications & Timezone ───────────────────────────────────
+  flutter_local_notifications: ^19.4.2
+  flutter_timezone: ^4.1.1
+  timezone: ^0.10.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/icons/
