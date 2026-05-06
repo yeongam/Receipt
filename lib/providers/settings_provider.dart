@@ -131,14 +131,20 @@ class SettingsProvider extends ChangeNotifier {
   bool validateAppLockPasscode(String passcode) {
     final stored = _user?.appLockPasscodeHash;
     if (stored == null || stored.isEmpty) return false;
+    if (stored.startsWith('pbkdf2:')) {
+      // Current format: pbkdf2:saltHex:derivedKeyHex
+      final parts = stored.split(':');
+      if (parts.length != 3) return false;
+      return _pbkdf2(passcode, parts[1]) == parts[2];
+    }
     if (stored.contains(':')) {
-      // New format: salt:sha256(salt + passcode)
+      // Legacy salted SHA-256: salt:sha256(salt + passcode)
       final idx = stored.indexOf(':');
       final salt = stored.substring(0, idx);
       final hash = stored.substring(idx + 1);
       return _sha256(salt + passcode) == hash;
     }
-    // Legacy format: plain sha256(passcode)
+    // Legacy plain SHA-256
     return _sha256(passcode) == stored;
   }
 
@@ -178,7 +184,7 @@ class SettingsProvider extends ChangeNotifier {
       if (user == null || authRepository == null) return;
       _user = await authRepository.updateProfile(
         user.copyWith(
-          appLockPasscodeHash: '$salt:${_sha256(salt + passcode)}',
+          appLockPasscodeHash: 'pbkdf2:$salt:${_pbkdf2(passcode, salt)}',
           appLockRecoveryCode: _sha256(recovery),
         ),
       );
@@ -189,6 +195,37 @@ class SettingsProvider extends ChangeNotifier {
   static String _sha256(String input) {
     final bytes = utf8.encode(input);
     return sha256.convert(bytes).toString();
+  }
+
+  /// PBKDF2-HMAC-SHA256 with [_pbkdf2Iterations] rounds.
+  /// Output: lowercase hex of the 32-byte derived key.
+  static const int _pbkdf2Iterations = 50000;
+
+  static String _pbkdf2(String password, String saltHex) {
+    final keyBytes = utf8.encode(password);
+    final saltBytes = Uint8List(saltHex.length ~/ 2);
+    for (var i = 0; i < saltBytes.length; i++) {
+      saltBytes[i] = int.parse(saltHex.substring(i * 2, i * 2 + 2), radix: 16);
+    }
+
+    final hmac = Hmac(sha256, keyBytes);
+
+    // U1 = HMAC(password, salt || 0x00000001)
+    final blockInput = Uint8List(saltBytes.length + 4);
+    blockInput.setRange(0, saltBytes.length, saltBytes);
+    blockInput[saltBytes.length + 3] = 1; // big-endian block index = 1
+
+    var u = Uint8List.fromList(hmac.convert(blockInput).bytes);
+    final dk = Uint8List.fromList(u);
+
+    for (var i = 1; i < _pbkdf2Iterations; i++) {
+      u = Uint8List.fromList(hmac.convert(u).bytes);
+      for (var j = 0; j < dk.length; j++) {
+        dk[j] ^= u[j];
+      }
+    }
+
+    return dk.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
   }
 
   static String _generateRecoveryCode() {

@@ -359,6 +359,14 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
           subtitle: 'Face ID 또는 지문 인증을 사용해요.',
           value: settings.biometric,
           onChanged: (value) {
+            if (value && !settings.hasAppLock) {
+              ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                const SnackBar(
+                  content: Text('생체 인증을 사용하려면 먼저 앱 잠금 PIN을 설정하세요.'),
+                ),
+              );
+              return;
+            }
             context.read<SettingsProvider>().updateSecurity(biometric: value);
           },
         ),

@@ -412,16 +412,21 @@ class _AppLockScreenState extends State<_AppLockScreen> {
     try {
       final auth = LocalAuthentication();
       final canCheck = await auth.canCheckBiometrics;
-      if (!canCheck || !mounted) return;
+      if (!canCheck || !mounted) {
+        _biometricTriggered = false; // allow manual retry
+        return;
+      }
       final authenticated = await auth.authenticate(
         localizedReason: '생체 인증으로 잠금을 해제하세요',
         options: const AuthenticationOptions(stickyAuth: true),
       );
       if (authenticated && mounted) {
         widget.onUnlocked();
+      } else {
+        _biometricTriggered = false; // cancelled → allow retry via button
       }
     } catch (_) {
-      // 생체 인증 불가 → PIN 입력으로 폴백
+      _biometricTriggered = false; // error → allow retry via button
     }
   }
 
@@ -650,25 +655,30 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   Future<void> _loadInitialData() async {
     final userId = resolveSignedInUserId(context) ?? '';
     final now = DateTime.now();
-    final transactionProvider = context.read<TransactionProvider>();
-    final categoryProvider = context.read<CategoryProvider>();
-    final fixedExpenseProvider = context.read<FixedExpenseProvider>();
     final authProvider = context.read<AuthProvider>();
     final settingsProvider = context.read<SettingsProvider>();
 
-    await Future.wait([
-      transactionProvider.loadMonth(userId, now),
-      transactionProvider.loadMonthlyTrends(userId),
-      categoryProvider.load(userId),
-      fixedExpenseProvider.load(userId),
-    ]);
-
+    // Load settings FIRST — must complete before the lock check in initState.
+    // Financial-data failures must not skip this step.
+    final authUser = authProvider.user;
+    if (authUser != null) {
+      await settingsProvider.load(user: authUser);
+    }
     if (!mounted) return;
 
-    final authUser = authProvider.user;
-    if (authUser == null || !mounted) return;
+    // Financial data: absorb individual failures so a single network error
+    // cannot leave settings unloaded and the lock gate open.
+    final transactionProvider = context.read<TransactionProvider>();
+    final categoryProvider = context.read<CategoryProvider>();
+    final fixedExpenseProvider = context.read<FixedExpenseProvider>();
 
-    await settingsProvider.load(user: authUser);
+    await Future.wait<void>([
+      transactionProvider.loadMonth(userId, now).catchError((Object _) {}),
+      transactionProvider.loadMonthlyTrends(userId).catchError((Object _) {}),
+      categoryProvider.load(userId).catchError((Object _) {}),
+      fixedExpenseProvider.load(userId).catchError((Object _) {}),
+    ]);
+
     if (!mounted) return;
 
     // Initialize notification service and sync schedules
