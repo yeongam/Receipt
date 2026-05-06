@@ -254,7 +254,7 @@ class AppPreferencesScreen extends StatelessWidget {
             DropdownButtonFormField<String>(
               initialValue: settings.themeLabel,
               decoration: const InputDecoration(labelText: '테마'),
-              items: const ['라이트']
+              items: const ['라이트', '다크']
                   .map(
                     (value) =>
                         DropdownMenuItem(value: value, child: Text(value)),
@@ -532,7 +532,7 @@ class _SettingsCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
@@ -629,7 +629,7 @@ class _SwitchCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
@@ -723,11 +723,17 @@ class _PinSetupDialogState extends State<_PinSetupDialog> {
       });
       return;
     }
-    setState(() => _saving = true);
+    // Capture PIN and zero both fields before any async work.
+    final pinToSave = _pin;
+    setState(() {
+      _saving = true;
+      _pin = '';
+      _confirmPin = '';
+    });
     try {
       final provider = context.read<SettingsProvider>();
-      await provider.setAppLockPasscode(_pin);
-      final recoveryCode = provider.recoveryCodeForDisplay;
+      await provider.setAppLockPasscode(pinToSave);
+      final recoveryCode = provider.consumeRecoveryCode();
       await provider.updateSecurity(lockOnLaunch: true);
       if (!mounted) return;
       Navigator.of(context).pop();

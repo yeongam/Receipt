@@ -91,29 +91,30 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
+  // Repositories are created once — not on every build.
+  final _authRepository = AuthRepository();
+  final _categoryRepository = CategoryRepository();
+  final _fixedExpenseRepository = FixedExpenseRepository();
+  final _transactionRepository = TransactionRepository();
+  final _budgetRepository = BudgetRepository();
+  final _notificationRepository = NotificationRepository();
+
   @override
   Widget build(BuildContext context) {
-    final authRepository = AuthRepository();
-    final categoryRepository = CategoryRepository();
-    final fixedExpenseRepository = FixedExpenseRepository();
-    final transactionRepository = TransactionRepository();
-    final budgetRepository = BudgetRepository();
-    final notificationRepository = NotificationRepository();
-
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider(authRepository)),
+        ChangeNotifierProvider(create: (_) => AuthProvider(_authRepository)),
         ChangeNotifierProvider(
-            create: (_) => CategoryProvider(categoryRepository)),
+            create: (_) => CategoryProvider(_categoryRepository)),
         ChangeNotifierProvider(
-            create: (_) => FixedExpenseProvider(fixedExpenseRepository)),
+            create: (_) => FixedExpenseProvider(_fixedExpenseRepository)),
         ChangeNotifierProvider(
-            create: (_) => TransactionProvider(transactionRepository)),
+            create: (_) => TransactionProvider(_transactionRepository)),
         ChangeNotifierProvider(
           create: (_) => SettingsProvider(
-            authRepository: authRepository,
-            budgetRepository: budgetRepository,
-            notificationRepository: notificationRepository,
+            authRepository: _authRepository,
+            budgetRepository: _budgetRepository,
+            notificationRepository: _notificationRepository,
           ),
         ),
       ],
@@ -202,178 +203,8 @@ class _RootGateState extends State<_RootGate> {
   }
 }
 
-class _LaunchLoadingScreen extends StatefulWidget {
-  const _LaunchLoadingScreen();
-
-  @override
-  State<_LaunchLoadingScreen> createState() => _LaunchLoadingScreenState();
-}
-
-class _LaunchLoadingScreenState extends State<_LaunchLoadingScreen>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _iconOpacity;
-  late final Animation<double> _textOpacity;
-  late final Animation<double> _progressWidthFactor;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1600),
-    )..forward();
-    _iconOpacity = CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0.0, 0.42, curve: Curves.easeOut),
-    );
-    _textOpacity = CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0.32, 0.76, curve: Curves.easeOut),
-    );
-    _progressWidthFactor = Tween<double>(
-      begin: 0.28,
-      end: 1,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.42, 1, curve: Curves.easeOutCubic),
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final backgroundColor = isDark ? AppColors.darkBackground : Colors.white;
-    final titleColor = isDark ? AppColors.darkTextPrimary : AppColors.secondary;
-    final subtitleColor =
-        isDark ? AppColors.darkTextSecondary : AppColors.textSecondary;
-    final ornamentPrimary = isDark
-        ? AppColors.primary.withValues(alpha: 0.14)
-        : AppColors.primaryLight.withValues(alpha: 0.65);
-    final ornamentAccent = isDark
-        ? AppColors.accent.withValues(alpha: 0.10)
-        : AppColors.accentLight.withValues(alpha: 0.34);
-    final progressTrackColor =
-        isDark ? AppColors.darkSurfaceAlt : AppColors.primaryLight;
-
-    return Scaffold(
-      backgroundColor: backgroundColor,
-      body: Stack(
-        children: [
-          Positioned(
-            top: -80,
-            right: -60,
-            child: Container(
-              width: 220,
-              height: 220,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: ornamentPrimary,
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -90,
-            left: -40,
-            child: Container(
-              width: 210,
-              height: 210,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: ornamentAccent,
-              ),
-            ),
-          ),
-          SafeArea(
-            child: Center(
-              child: AnimatedBuilder(
-                animation: _controller,
-                builder: (context, _) {
-                  return Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Opacity(
-                        opacity: _iconOpacity.value,
-                        child: const SizedBox(
-                          width: 104,
-                          height: 104,
-                          child: Image(
-                            image: AssetImage(
-                              'assets/images/loading_logo.png',
-                            ),
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      Opacity(
-                        opacity: _textOpacity.value,
-                        child: Text(
-                          '내돈내역',
-                          style: AppTextStyles.displayLarge.copyWith(
-                            color: titleColor,
-                            fontSize: 34,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Opacity(
-                        opacity: _textOpacity.value,
-                        child: Text(
-                          '내 지출과 수입을 한눈에 관리하는 가계부',
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: subtitleColor,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 22),
-                      Opacity(
-                        opacity: _textOpacity.value,
-                        child: Container(
-                          width: 82,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: progressTrackColor,
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          alignment: Alignment.centerLeft,
-                          child: FractionallySizedBox(
-                            widthFactor: _progressWidthFactor.value,
-                            child: Container(
-                              height: 6,
-                              decoration: BoxDecoration(
-                                color: AppColors.primary,
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _AppLockScreen extends StatefulWidget {
-  final bool Function(String pin) validatePin;
+  final Future<bool> Function(String pin) validatePin;
   final Future<bool> Function(String code) validateRecoveryCode;
   final Future<void> Function() disableAppLock;
   final VoidCallback onUnlocked;
@@ -396,6 +227,7 @@ class _AppLockScreenState extends State<_AppLockScreen> {
   int _failedAttempts = 0;
   static const int _maxAttempts = 5;
   bool _showError = false;
+  bool _validating = false;
   bool _biometricTriggered = false;
 
   @override
@@ -431,7 +263,7 @@ class _AppLockScreenState extends State<_AppLockScreen> {
   }
 
   void _onKey(String digit) {
-    if (_pin.length >= 6) return;
+    if (_pin.length >= 6 || _validating) return;
     setState(() {
       _pin += digit;
       _showError = false;
@@ -440,18 +272,26 @@ class _AppLockScreenState extends State<_AppLockScreen> {
   }
 
   void _onDelete() {
-    if (_pin.isEmpty) return;
+    if (_pin.isEmpty || _validating) return;
     setState(() => _pin = _pin.substring(0, _pin.length - 1));
   }
 
-  void _submit() {
-    final ok = widget.validatePin(_pin);
+  Future<void> _submit() async {
+    if (_validating) return;
+    // Capture and immediately zero the PIN from UI state before async work.
+    final pin = _pin;
+    setState(() {
+      _validating = true;
+      _pin = '';
+    });
+    final ok = await widget.validatePin(pin);
+    if (!mounted) return;
+    setState(() => _validating = false);
     if (ok) {
       widget.onUnlocked();
     } else {
       setState(() {
         _failedAttempts++;
-        _pin = '';
         _showError = true;
       });
       if (_failedAttempts >= _maxAttempts) {
@@ -515,22 +355,30 @@ class _AppLockScreenState extends State<_AppLockScreen> {
             const SizedBox(height: 24),
             PinDots(length: _pin.length),
             const SizedBox(height: 32),
-            NumericPinPad(
-              onDigitPressed: _onKey,
-              onBackspacePressed: _onDelete,
-            ),
+            if (_validating)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: CircularProgressIndicator(),
+              )
+            else
+              NumericPinPad(
+                onDigitPressed: _onKey,
+                onBackspacePressed: _onDelete,
+              ),
             const SizedBox(height: 24),
             if (widget.biometricEnabled) ...[
               TextButton.icon(
-                onPressed: _tryBiometric,
+                onPressed: _validating ? null : _tryBiometric,
                 icon: const Icon(Icons.fingerprint),
                 label: const Text('생체 인증으로 해제'),
               ),
               const SizedBox(height: 4),
             ],
-            TextButton(
-              onPressed: _showRecoveryDialog,
-              child: Text(
+            // Recovery dialog shown only after at least one failed attempt.
+            if (_failedAttempts >= 1)
+              TextButton(
+                onPressed: _validating ? null : _showRecoveryDialog,
+                child: Text(
                 'PIN을 잊으셨나요?',
                 style: AppTextStyles.bodySmall.copyWith(
                   color: AppColors.primary,
@@ -565,6 +413,8 @@ class _RecoveryCodeUnlockDialogState
     extends State<_RecoveryCodeUnlockDialog> {
   final _controller = TextEditingController();
   bool _showError = false;
+  int _attempts = 0;
+  static const int _maxAttempts = 5;
 
   @override
   void dispose() {
@@ -573,19 +423,28 @@ class _RecoveryCodeUnlockDialogState
   }
 
   Future<void> _submit() async {
+    if (_attempts >= _maxAttempts) return;
     final ok = await widget.validateCode(_controller.text.trim());
+    if (!mounted) return;
     if (ok) {
       await widget.disableLock();
       if (!mounted) return;
       Navigator.of(context).pop();
       widget.onUnlocked();
     } else {
-      setState(() => _showError = true);
+      setState(() {
+        _showError = true;
+        _attempts++;
+      });
+      if (_attempts >= _maxAttempts && mounted) {
+        Navigator.of(context).pop();
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final exhausted = _attempts >= _maxAttempts;
     return AlertDialog(
       title: const Text('복구 코드로 잠금 해제'),
       content: Column(
@@ -595,6 +454,7 @@ class _RecoveryCodeUnlockDialogState
           const SizedBox(height: 16),
           TextField(
             controller: _controller,
+            enabled: !exhausted,
             decoration: InputDecoration(
               labelText: '복구 코드',
               errorText: _showError ? '올바르지 않은 복구 코드입니다.' : null,
@@ -609,7 +469,7 @@ class _RecoveryCodeUnlockDialogState
           child: const Text('취소'),
         ),
         ElevatedButton(
-          onPressed: _submit,
+          onPressed: exhausted ? null : _submit,
           child: const Text('확인'),
         ),
       ],
@@ -756,16 +616,19 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLocked) {
-      final settings = context.read<SettingsProvider>();
-      return _AppLockScreen(
-        validatePin: settings.validateAppLockPasscode,
-        validateRecoveryCode: settings.validateRecoveryCodeForUnlock,
-        disableAppLock: settings.disableAppLock,
-        onUnlocked: () {
-          setState(() => _isLocked = false);
-          _initNotificationService();
-        },
-        biometricEnabled: settings.biometric,
+      // Use Consumer so that the lock-screen callbacks always reference the
+      // latest SettingsProvider instance (e.g. if _user reloads mid-session).
+      return Consumer<SettingsProvider>(
+        builder: (context, settings, _) => _AppLockScreen(
+          validatePin: settings.validateAppLockPasscode,
+          validateRecoveryCode: settings.validateRecoveryCodeForUnlock,
+          disableAppLock: settings.disableAppLock,
+          onUnlocked: () {
+            setState(() => _isLocked = false);
+            _initNotificationService();
+          },
+          biometricEnabled: settings.biometric,
+        ),
       );
     }
     // While loading, show blank screen to prevent data exposure before lock check

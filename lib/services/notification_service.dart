@@ -179,19 +179,16 @@ class NotificationService {
     required int monthOffset,
   }) {
     final now = tz.TZDateTime.now(tz.local);
-    final targetMonth =
-        tz.TZDateTime(tz.local, now.year, now.month + monthOffset, 1);
-    final lastDay = tz.TZDateTime(
-      tz.local,
-      targetMonth.year,
-      targetMonth.month + 1,
-      0,
-    ).day;
+    // Use Dart's DateTime for overflow-safe month arithmetic (month > 12
+    // normalises automatically), then construct TZDateTime from the result.
+    final rawTarget = DateTime(now.year, now.month + monthOffset, 1);
+    final rawLastDay = DateTime(rawTarget.year, rawTarget.month + 1, 0);
+    final lastDay = rawLastDay.day;
     final normalizedDay = dueDay.clamp(1, lastDay);
     final dueDate = tz.TZDateTime(
       tz.local,
-      targetMonth.year,
-      targetMonth.month,
+      rawTarget.year,
+      rawTarget.month,
       normalizedDay,
       9,
     );

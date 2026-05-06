@@ -13,6 +13,11 @@ import '../data/repositories/auth_repository.dart';
 import '../data/repositories/budget_repository.dart';
 import '../data/repositories/notification_repository.dart';
 
+/// Top-level function for running PBKDF2 in a compute isolate.
+/// Must be top-level (not a closure) to be isolate-sendable.
+String _doPbkdf2(List<String> args) =>
+    SettingsProvider._pbkdf2(args[0], args[1]);
+
 abstract class SettingsStore {
   Future<String?> read(String key);
   Future<void> write(String key, String value);
@@ -120,22 +125,24 @@ class SettingsProvider extends ChangeNotifier {
   /// Whether app lock passcode is configured.
   bool get hasAppLock => _user?.appLockPasscodeHash?.isNotEmpty == true;
 
-  /// Valid only once, immediately after setAppLockPasscode().
-  /// WARNING: Never call from build() or Consumer — rebuilds will return null.
-  String? get recoveryCodeForDisplay {
+  /// Returns the recovery code produced by the last successful [setAppLockPasscode].
+  /// One-time read: returns null on subsequent calls. Never call from build().
+  String? consumeRecoveryCode() {
     final code = _pendingRecoveryCode;
     _pendingRecoveryCode = null;
     return code;
   }
 
-  bool validateAppLockPasscode(String passcode) {
+  /// Validates [passcode] against the stored hash.
+  /// Runs PBKDF2 on a compute isolate to avoid blocking the UI thread.
+  Future<bool> validateAppLockPasscode(String passcode) async {
     final stored = _user?.appLockPasscodeHash;
     if (stored == null || stored.isEmpty) return false;
     if (stored.startsWith('pbkdf2:')) {
-      // Current format: pbkdf2:saltHex:derivedKeyHex
       final parts = stored.split(':');
       if (parts.length != 3) return false;
-      return _pbkdf2(passcode, parts[1]) == parts[2];
+      final derived = await compute(_doPbkdf2, [passcode, parts[1]]);
+      return derived == parts[2];
     }
     if (stored.contains(':')) {
       // Legacy salted SHA-256: salt:sha256(salt + passcode)
@@ -176,18 +183,20 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setAppLockPasscode(String passcode) {
     final recovery = _generateRecoveryCode();
     final salt = _generateSalt();
-    _pendingRecoveryCode = recovery;
-    notifyListeners();
     return _queueWork(() async {
       final user = _user;
       final authRepository = _authRepository;
       if (user == null || authRepository == null) return;
+      // Run PBKDF2 on a compute isolate — must complete before the save.
+      final hash = await compute(_doPbkdf2, [passcode, salt]);
       _user = await authRepository.updateProfile(
         user.copyWith(
-          appLockPasscodeHash: 'pbkdf2:$salt:${_pbkdf2(passcode, salt)}',
+          appLockPasscodeHash: 'pbkdf2:$salt:$hash',
           appLockRecoveryCode: _sha256(recovery),
         ),
       );
+      // Expose recovery code ONLY after the Supabase write succeeds.
+      _pendingRecoveryCode = recovery;
       notifyListeners();
     });
   }
@@ -424,8 +433,8 @@ class SettingsProvider extends ChangeNotifier {
       _lockOnLaunch = map['lockOnLaunch'] as bool? ?? _lockOnLaunch;
       _biometric = map['biometric'] as bool? ?? _biometric;
       notifyListeners();
-    } catch (_) {
-      // Keep defaults if local settings are unreadable.
+    } catch (e) {
+      debugPrint('[SettingsProvider] Storage read failed: $e');
     }
   }
 

@@ -1,3 +1,6 @@
+// Sentinel for "not provided" in copyWith — allows explicitly passing null.
+const _notSet = Object();
+
 class AppUser {
   final String id;
   final String email;
@@ -86,10 +89,8 @@ class AppUser {
       'budget_warning_secondary': budgetWarningSecondary,
       'budget_start_day': budgetStartDay,
       'is_profile_completed': isProfileCompleted,
-      if (appLockPasscodeHash != null)
-        'app_lock_passcode_hash': appLockPasscodeHash,
-      if (appLockRecoveryCode != null)
-        'app_lock_recovery_code': appLockRecoveryCode,
+      'app_lock_passcode_hash': appLockPasscodeHash,
+      'app_lock_recovery_code': appLockRecoveryCode,
     };
   }
 
@@ -108,8 +109,9 @@ class AppUser {
     int? budgetWarningSecondary,
     String? budgetStartDay,
     bool? isProfileCompleted,
-    String? appLockPasscodeHash,
-    String? appLockRecoveryCode,
+    // Use sentinel so callers can pass null to explicitly clear these fields.
+    Object? appLockPasscodeHash = _notSet,
+    Object? appLockRecoveryCode = _notSet,
   }) {
     return AppUser(
       id: id,
@@ -131,8 +133,12 @@ class AppUser {
       isProfileCompleted: isProfileCompleted ?? this.isProfileCompleted,
       createdAt: createdAt,
       updatedAt: updatedAt,
-      appLockPasscodeHash: appLockPasscodeHash ?? this.appLockPasscodeHash,
-      appLockRecoveryCode: appLockRecoveryCode ?? this.appLockRecoveryCode,
+      appLockPasscodeHash: appLockPasscodeHash == _notSet
+          ? this.appLockPasscodeHash
+          : appLockPasscodeHash as String?,
+      appLockRecoveryCode: appLockRecoveryCode == _notSet
+          ? this.appLockRecoveryCode
+          : appLockRecoveryCode as String?,
     );
   }
 }
