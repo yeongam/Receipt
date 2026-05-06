@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:local_auth/local_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -376,12 +377,14 @@ class _AppLockScreen extends StatefulWidget {
   final Future<bool> Function(String code) validateRecoveryCode;
   final Future<void> Function() disableAppLock;
   final VoidCallback onUnlocked;
+  final bool biometricEnabled;
 
   const _AppLockScreen({
     required this.validatePin,
     required this.validateRecoveryCode,
     required this.disableAppLock,
     required this.onUnlocked,
+    this.biometricEnabled = false,
   });
 
   @override
@@ -393,6 +396,34 @@ class _AppLockScreenState extends State<_AppLockScreen> {
   int _failedAttempts = 0;
   static const int _maxAttempts = 5;
   bool _showError = false;
+  bool _biometricTriggered = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.biometricEnabled) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _tryBiometric());
+    }
+  }
+
+  Future<void> _tryBiometric() async {
+    if (_biometricTriggered) return;
+    _biometricTriggered = true;
+    try {
+      final auth = LocalAuthentication();
+      final canCheck = await auth.canCheckBiometrics;
+      if (!canCheck || !mounted) return;
+      final authenticated = await auth.authenticate(
+        localizedReason: '생체 인증으로 잠금을 해제하세요',
+        options: const AuthenticationOptions(stickyAuth: true),
+      );
+      if (authenticated && mounted) {
+        widget.onUnlocked();
+      }
+    } catch (_) {
+      // 생체 인증 불가 → PIN 입력으로 폴백
+    }
+  }
 
   void _onKey(String digit) {
     if (_pin.length >= 6) return;
@@ -484,6 +515,14 @@ class _AppLockScreenState extends State<_AppLockScreen> {
               onBackspacePressed: _onDelete,
             ),
             const SizedBox(height: 24),
+            if (widget.biometricEnabled) ...[
+              TextButton.icon(
+                onPressed: _tryBiometric,
+                icon: const Icon(Icons.fingerprint),
+                label: const Text('생체 인증으로 해제'),
+              ),
+              const SizedBox(height: 4),
+            ],
             TextButton(
               onPressed: _showRecoveryDialog,
               child: Text(
@@ -594,7 +633,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       context.read<SettingsProvider>().startScreen,
     );
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await _loadInitialData();
+      try {
+        await _loadInitialData();
+      } catch (e) {
+        debugPrint('[MainNav] _loadInitialData failed: $e');
+      }
       if (!mounted) return;
       final settings = context.read<SettingsProvider>();
       setState(() {
@@ -697,6 +740,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         validateRecoveryCode: settings.validateRecoveryCodeForUnlock,
         disableAppLock: settings.disableAppLock,
         onUnlocked: () => setState(() => _isLocked = false),
+        biometricEnabled: settings.biometric,
       );
     }
     // While loading, show blank screen to prevent data exposure before lock check
