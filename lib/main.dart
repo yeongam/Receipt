@@ -48,6 +48,12 @@ Future<void> main() async {
   runApp(const MyApp());
 }
 
+class _AppScrollBehavior extends ScrollBehavior {
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) =>
+      const BouncingScrollPhysics();
+}
+
 class MissingSupabaseConfigApp extends StatelessWidget {
   const MissingSupabaseConfigApp({super.key});
 
@@ -108,6 +114,11 @@ class MyApp extends StatelessWidget {
         title: '통합 지출관리',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
+        scrollBehavior: _AppScrollBehavior(),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(textScaler: TextScaler.noScaling),
+          child: child!,
+        ),
         home: const _RootGate(),
       ),
     );
