@@ -28,6 +28,7 @@ import 'screens/report/report_screen.dart';
 import 'screens/notification/notification_screen.dart';
 import 'screens/mypage/mypage_screen.dart';
 import 'screens/shared/pin_pad.dart';
+import 'screens/shared/transaction_entry_sheet.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 Future<void> main() async {
@@ -581,6 +582,8 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
   bool _isLocked = false;
+  Offset? _fabOffset;
+  bool _isDraggingFab = false;
 
   @override
   void initState() {
@@ -676,7 +679,81 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       );
     }
     return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: _screens),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          const fabSize = 56.0;
+          const horizontalMargin = 16.0;
+          const bottomMargin = 16.0;
+          const topMargin = 96.0;
+          const railInset = 16.0;
+
+          _fabOffset ??= Offset(
+            constraints.maxWidth - fabSize - horizontalMargin,
+            constraints.maxHeight - fabSize - bottomMargin,
+          );
+
+          const leftRail = railInset;
+          final rightRail =
+              (constraints.maxWidth - fabSize - railInset).clamp(0.0, double.infinity);
+          final maxX =
+              (constraints.maxWidth - fabSize).clamp(0.0, double.infinity);
+          const minY = topMargin;
+          final maxY = (constraints.maxHeight - fabSize - bottomMargin)
+              .clamp(minY, double.infinity);
+          final clampedOffset = Offset(
+            _fabOffset!.dx.clamp(0.0, maxX),
+            _fabOffset!.dy.clamp(minY, maxY),
+          );
+          if (clampedOffset != _fabOffset) _fabOffset = clampedOffset;
+
+          void snapFabToRail() {
+            final current = _fabOffset!;
+            final snapX =
+                (current.dx - leftRail).abs() < (current.dx - rightRail).abs()
+                    ? leftRail
+                    : rightRail;
+            setState(() {
+              _isDraggingFab = false;
+              _fabOffset = Offset(snapX, current.dy.clamp(minY, maxY));
+            });
+          }
+
+          return Stack(
+            children: [
+              Positioned.fill(
+                child: IndexedStack(index: _currentIndex, children: _screens),
+              ),
+              AnimatedPositioned(
+                duration: _isDraggingFab
+                    ? Duration.zero
+                    : const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                left: _fabOffset!.dx,
+                top: _fabOffset!.dy,
+                child: GestureDetector(
+                  onPanStart: (_) => setState(() => _isDraggingFab = true),
+                  onPanUpdate: (details) {
+                    setState(() {
+                      _fabOffset = Offset(
+                        (_fabOffset!.dx + details.delta.dx).clamp(0.0, maxX),
+                        (_fabOffset!.dy + details.delta.dy).clamp(minY, maxY),
+                      );
+                    });
+                  },
+                  onPanEnd: (_) => snapFabToRail(),
+                  onPanCancel: snapFabToRail,
+                  child: FloatingActionButton(
+                    onPressed: () => openQuickAddHub(context),
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    child: const Icon(Icons.add_rounded, size: 28),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -690,7 +767,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         ),
         child: SafeArea(
           child: SizedBox(
-            height: 60,
+            height: 76,
             child: Row(
               children: List.generate(_navItems.length, (index) {
                 final item = _navItems[index];
@@ -703,7 +780,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     borderRadius: BorderRadius.circular(12),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      padding: const EdgeInsets.fromLTRB(0, 8, 0, 10),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
