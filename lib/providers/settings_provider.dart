@@ -129,9 +129,17 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   bool validateAppLockPasscode(String passcode) {
-    final hash = _user?.appLockPasscodeHash;
-    if (hash == null || hash.isEmpty) return false;
-    return _sha256(passcode) == hash;
+    final stored = _user?.appLockPasscodeHash;
+    if (stored == null || stored.isEmpty) return false;
+    if (stored.contains(':')) {
+      // New format: salt:sha256(salt + passcode)
+      final idx = stored.indexOf(':');
+      final salt = stored.substring(0, idx);
+      final hash = stored.substring(idx + 1);
+      return _sha256(salt + passcode) == hash;
+    }
+    // Legacy format: plain sha256(passcode)
+    return _sha256(passcode) == stored;
   }
 
   Future<bool> validateRecoveryCodeForUnlock(String code) async {
@@ -161,6 +169,7 @@ class SettingsProvider extends ChangeNotifier {
 
   Future<void> setAppLockPasscode(String passcode) {
     final recovery = _generateRecoveryCode();
+    final salt = _generateSalt();
     _pendingRecoveryCode = recovery;
     notifyListeners();
     return _queueWork(() async {
@@ -169,7 +178,7 @@ class SettingsProvider extends ChangeNotifier {
       if (user == null || authRepository == null) return;
       _user = await authRepository.updateProfile(
         user.copyWith(
-          appLockPasscodeHash: _sha256(passcode),
+          appLockPasscodeHash: '$salt:${_sha256(salt + passcode)}',
           appLockRecoveryCode: _sha256(recovery),
         ),
       );
@@ -186,6 +195,12 @@ class SettingsProvider extends ChangeNotifier {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     final rng = Random.secure();
     return List.generate(12, (_) => chars[rng.nextInt(chars.length)]).join();
+  }
+
+  static String _generateSalt() {
+    final rng = Random.secure();
+    final bytes = List<int>.generate(16, (_) => rng.nextInt(256));
+    return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
   }
 
   Future<void> get ready => _pendingWork;
