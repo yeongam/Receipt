@@ -660,6 +660,7 @@ class _PinSetupDialogState extends State<_PinSetupDialog> {
 
   void _onKey(String digit) {
     if (_saving) return;
+    bool shouldSave = false;
     setState(() {
       _mismatch = false;
       if (!_confirming) {
@@ -670,10 +671,11 @@ class _PinSetupDialogState extends State<_PinSetupDialog> {
       } else {
         if (_confirmPin.length < 6) {
           _confirmPin += digit;
-          if (_confirmPin.length == 6) _save();
+          if (_confirmPin.length == 6) shouldSave = true;
         }
       }
     });
+    if (shouldSave) _save();
   }
 
   void _onDelete() {
@@ -699,43 +701,51 @@ class _PinSetupDialogState extends State<_PinSetupDialog> {
       return;
     }
     setState(() => _saving = true);
-    final provider = context.read<SettingsProvider>();
-    await provider.setAppLockPasscode(_pin);
-    final recoveryCode = provider.recoveryCodeForDisplay;
-    await provider.updateSecurity(lockOnLaunch: true);
-    if (!mounted) return;
-    Navigator.of(context).pop();
-    if (recoveryCode != null) {
-      showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => AlertDialog(
-          title: const Text('복구 코드 저장'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                '아래 복구 코드를 안전한 곳에 저장하세요.\nPIN을 잊었을 때 사용할 수 있으며 다시 표시되지 않습니다.',
-              ),
-              const SizedBox(height: 16),
-              SelectableText(
-                recoveryCode,
-                style: const TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
+    try {
+      final provider = context.read<SettingsProvider>();
+      await provider.setAppLockPasscode(_pin);
+      final recoveryCode = provider.recoveryCodeForDisplay;
+      await provider.updateSecurity(lockOnLaunch: true);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      if (recoveryCode != null) {
+        showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => AlertDialog(
+            title: const Text('복구 코드 저장'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  '아래 복구 코드를 안전한 곳에 저장하세요.\nPIN을 잊었을 때 사용할 수 있으며 다시 표시되지 않습니다.',
                 ),
+                const SizedBox(height: 16),
+                SelectableText(
+                  recoveryCode,
+                  style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 2,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('저장했습니다'),
               ),
             ],
           ),
-          actions: [
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('저장했습니다'),
-            ),
-          ],
-        ),
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(content: Text('PIN 저장에 실패했습니다. 다시 시도해 주세요.')),
       );
     }
   }
