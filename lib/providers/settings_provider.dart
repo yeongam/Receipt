@@ -115,6 +115,7 @@ class SettingsProvider extends ChangeNotifier {
 
   bool get lockOnLaunch => _lockOnLaunch;
   bool get biometric => _biometric;
+  NotificationSetting? get notificationSetting => _notificationSetting;
 
   /// Whether app lock passcode is configured.
   bool get hasAppLock => _user?.appLockPasscodeHash?.isNotEmpty == true;

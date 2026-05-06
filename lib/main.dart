@@ -29,6 +29,7 @@ import 'screens/notification/notification_screen.dart';
 import 'screens/mypage/mypage_screen.dart';
 import 'screens/shared/pin_pad.dart';
 import 'screens/shared/transaction_entry_sheet.dart';
+import 'services/notification_service.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 Future<void> main() async {
@@ -623,6 +624,24 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     if (authUser == null || !mounted) return;
 
     await settingsProvider.load(user: authUser);
+    if (!mounted) return;
+
+    // Initialize notification service and sync schedules
+    final notificationService = NotificationService.instance;
+    await notificationService.initialize();
+    final granted = await notificationService.requestPermissions();
+    if (granted && mounted) {
+      final notificationSetting = settingsProvider.notificationSetting;
+      final fixedExpenses = context.read<FixedExpenseProvider>().items;
+      if (notificationSetting != null) {
+        await notificationService.syncSchedules(
+          setting: notificationSetting,
+          activeFixedExpenses: fixedExpenses,
+          isEnglish: settingsProvider.isEnglish,
+        );
+      }
+    }
+
     if (!mounted) return;
     setState(() {
       _currentIndex = SettingsProvider.navigationIndexFor(
