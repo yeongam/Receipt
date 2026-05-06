@@ -1,6 +1,9 @@
 import 'dart:convert';
+import 'dart:math';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart' show Locale;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../data/models/app_user.dart';
@@ -62,6 +65,7 @@ class SettingsProvider extends ChangeNotifier {
 
   Future<void> _pendingWork = Future.value();
   AppUser? _user;
+  String? _pendingRecoveryCode;  // read-once recovery code
   NotificationSetting? _notificationSetting;
   bool _isLoaded = false;
 
@@ -98,6 +102,7 @@ class SettingsProvider extends ChangeNotifier {
 
   String get language => _language;
   bool get isEnglish => _language == 'English';
+  Locale get locale => Locale(_language == 'English' ? 'en' : 'ko');
   String get currency => _currency;
   bool get compactView => _compactView;
   bool get showWeeklySummary => _showWeeklySummary;
@@ -111,13 +116,76 @@ class SettingsProvider extends ChangeNotifier {
   bool get lockOnLaunch => _lockOnLaunch;
   bool get biometric => _biometric;
 
-  /// Whether app lock passcode is configured. Updated by Task 14.
-  bool get hasAppLock => false;
+  /// Whether app lock passcode is configured.
+  bool get hasAppLock => _user?.appLockPasscodeHash?.isNotEmpty == true;
 
-  // Stubs — replaced by real implementations in Task 14.
-  bool validateAppLockPasscode(String pin) => false;
-  Future<bool> validateRecoveryCodeForUnlock(String code) async => false;
-  Future<void> disableAppLock() async {}
+  /// Valid only once, immediately after setAppLockPasscode().
+  /// WARNING: Never call from build() or Consumer — rebuilds will return null.
+  String? get recoveryCodeForDisplay {
+    final code = _pendingRecoveryCode;
+    _pendingRecoveryCode = null;
+    return code;
+  }
+
+  bool validateAppLockPasscode(String passcode) {
+    final hash = _user?.appLockPasscodeHash;
+    if (hash == null || hash.isEmpty) return false;
+    return _sha256(passcode) == hash;
+  }
+
+  Future<bool> validateRecoveryCodeForUnlock(String code) async {
+    final hash = _user?.appLockRecoveryCode;
+    if (hash == null || hash.isEmpty) return false;
+    return _sha256(code) == hash;
+  }
+
+  Future<void> disableAppLock() {
+    return _queueWork(() async {
+      final user = _user;
+      final authRepository = _authRepository;
+      if (user == null || authRepository == null) return;
+      _user = await authRepository.updateProfile(
+        user.copyWith(
+          appLockPasscodeHash: '',
+          appLockRecoveryCode: '',
+          lockOnLaunch: false,
+          biometricEnabled: false,
+        ),
+      );
+      _lockOnLaunch = false;
+      _biometric = false;
+      notifyListeners();
+    });
+  }
+
+  Future<void> setAppLockPasscode(String passcode) {
+    final recovery = _generateRecoveryCode();
+    _pendingRecoveryCode = recovery;
+    notifyListeners();
+    return _queueWork(() async {
+      final user = _user;
+      final authRepository = _authRepository;
+      if (user == null || authRepository == null) return;
+      _user = await authRepository.updateProfile(
+        user.copyWith(
+          appLockPasscodeHash: _sha256(passcode),
+          appLockRecoveryCode: _sha256(recovery),
+        ),
+      );
+      notifyListeners();
+    });
+  }
+
+  static String _sha256(String input) {
+    final bytes = utf8.encode(input);
+    return sha256.convert(bytes).toString();
+  }
+
+  static String _generateRecoveryCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    final rng = Random.secure();
+    return List.generate(12, (_) => chars[rng.nextInt(chars.length)]).join();
+  }
 
   Future<void> get ready => _pendingWork;
   bool get isLoaded => _isLoaded;
