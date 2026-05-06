@@ -1,0 +1,445 @@
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+import '../data/models/app_user.dart';
+import '../data/models/budget.dart';
+import '../data/models/notification_setting.dart';
+import '../data/repositories/auth_repository.dart';
+import '../data/repositories/budget_repository.dart';
+import '../data/repositories/notification_repository.dart';
+
+abstract class SettingsStore {
+  Future<String?> read(String key);
+  Future<void> write(String key, String value);
+}
+
+class SecureSettingsStore implements SettingsStore {
+  SecureSettingsStore([FlutterSecureStorage? storage])
+    : _storage = storage ?? const FlutterSecureStorage();
+
+  final FlutterSecureStorage _storage;
+
+  @override
+  Future<String?> read(String key) => _storage.read(key: key);
+
+  @override
+  Future<void> write(String key, String value) =>
+      _storage.write(key: key, value: value);
+}
+
+class SettingsProvider extends ChangeNotifier {
+  SettingsProvider({
+    AuthRepository? authRepository,
+    BudgetRepository? budgetRepository,
+    NotificationRepository? notificationRepository,
+    SettingsStore? storage,
+  }) : _authRepository = authRepository,
+       _budgetRepository = budgetRepository,
+       _notificationRepository = notificationRepository,
+       _storage = storage ?? SecureSettingsStore() {
+    _pendingWork = _loadFromStorage();
+  }
+
+  static const String _storageKey = 'settings.v1';
+
+  static int navigationIndexFor(String startScreen) {
+    return switch (startScreen) {
+      '홈' => 0,
+      '내역' => 1,
+      '리포트' => 2,
+      '알림' => 3,
+      '마이' => 4,
+      _ => 0,
+    };
+  }
+
+  final AuthRepository? _authRepository;
+  final BudgetRepository? _budgetRepository;
+  final NotificationRepository? _notificationRepository;
+  final SettingsStore _storage;
+
+  Future<void> _pendingWork = Future.value();
+  AppUser? _user;
+  NotificationSetting? _notificationSetting;
+  bool _isLoaded = false;
+
+  int _monthlyBudget = 2000000;
+  int _budgetWarningPrimary = 80;
+  int _budgetWarningSecondary = 100;
+  String _budgetStartDay = '매월 1일';
+
+  bool _budgetAlert = true;
+  bool _fixedExpenseAlert = true;
+  bool _reminderAlert = false;
+
+  String _language = '한국어';
+  String _currency = 'KRW';
+  bool _compactView = false;
+  bool _showWeeklySummary = true;
+  String _themeLabel = '라이트';
+  String _startScreen = '홈';
+
+  bool _lockOnLaunch = false;
+  bool _biometric = false;
+
+  bool _hasPersistedMonthlyBudget = false;
+  bool _hasPersistedCurrency = false;
+
+  int get monthlyBudget => _monthlyBudget;
+  int get budgetWarningPrimary => _budgetWarningPrimary;
+  int get budgetWarningSecondary => _budgetWarningSecondary;
+  String get budgetStartDay => _budgetStartDay;
+
+  bool get budgetAlert => _budgetAlert;
+  bool get fixedExpenseAlert => _fixedExpenseAlert;
+  bool get reminderAlert => _reminderAlert;
+
+  String get language => _language;
+  bool get isEnglish => _language == 'English';
+  String get currency => _currency;
+  bool get compactView => _compactView;
+  bool get showWeeklySummary => _showWeeklySummary;
+  String get themeLabel => _themeLabel;
+
+  /// Returns 'dark' or 'light'. Handles legacy Korean values.
+  String get themeToken => (_themeLabel == '다크' || _themeLabel == 'dark') ? 'dark' : 'light';
+
+  String get startScreen => _startScreen;
+
+  bool get lockOnLaunch => _lockOnLaunch;
+  bool get biometric => _biometric;
+
+  /// Whether app lock passcode is configured. Updated by Task 14.
+  bool get hasAppLock => false;
+
+  // Stubs — replaced by real implementations in Task 14.
+  bool validateAppLockPasscode(String pin) => false;
+  Future<bool> validateRecoveryCodeForUnlock(String code) async => false;
+  Future<void> disableAppLock() async {}
+
+  Future<void> get ready => _pendingWork;
+  bool get isLoaded => _isLoaded;
+
+  void loadFromUser(AppUser user) {
+    _user = user;
+    var changed = false;
+
+    if (!_hasPersistedMonthlyBudget && user.monthlyIncome > 0) {
+      _monthlyBudget = user.monthlyIncome;
+      changed = true;
+    }
+    if (!_hasPersistedCurrency && user.currency.isNotEmpty) {
+      _currency = user.currency;
+      changed = true;
+    }
+
+    if (!changed) return;
+
+    _schedulePersist();
+    notifyListeners();
+  }
+
+  Future<void> load({required AppUser user}) async {
+    await ready;
+
+    _resetAccountScopedValues();
+    _user = user;
+    _applyUserSettings(user);
+
+    final budgetRepository = _budgetRepository;
+    if (budgetRepository != null) {
+      final budget = await budgetRepository.fetchByMonth(
+        user.id,
+        _currentBudgetMonth(),
+      );
+      if (budget != null) {
+        _monthlyBudget = budget.totalLimit;
+        _hasPersistedMonthlyBudget = true;
+      }
+    }
+
+    final notificationRepository = _notificationRepository;
+    if (notificationRepository != null) {
+      _notificationSetting = await notificationRepository.fetchSetting(user.id);
+      if (_notificationSetting != null) {
+        _applyNotificationSettings(_notificationSetting!);
+      }
+    }
+
+    _isLoaded = true;
+    _schedulePersist();
+    notifyListeners();
+  }
+
+  Future<void> updateMonthlyBudget(int value) {
+    _monthlyBudget = value;
+    _hasPersistedMonthlyBudget = true;
+    notifyListeners();
+    return _queueWork(() async {
+      await _persist();
+      final user = _user;
+      final budgetRepository = _budgetRepository;
+      if (budgetRepository == null || user == null) return;
+      await budgetRepository.upsert(
+        Budget(
+          id: '',
+          userId: user.id,
+          month: _currentBudgetMonth(),
+          totalLimit: value,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      );
+    });
+  }
+
+  Future<void> updateBudgetWarnings({
+    int? primary,
+    int? secondary,
+    String? startDay,
+  }) async {
+    if (primary != null) _budgetWarningPrimary = primary;
+    if (secondary != null) _budgetWarningSecondary = secondary;
+    if (startDay != null) _budgetStartDay = startDay;
+    notifyListeners();
+    return _queueWork(() async {
+      await _persist();
+      await _persistUserProfile();
+    });
+  }
+
+  Future<void> updateAlerts({
+    bool? budgetAlert,
+    bool? fixedExpenseAlert,
+    bool? reminderAlert,
+  }) async {
+    if (budgetAlert != null) _budgetAlert = budgetAlert;
+    if (fixedExpenseAlert != null) _fixedExpenseAlert = fixedExpenseAlert;
+    if (reminderAlert != null) _reminderAlert = reminderAlert;
+    notifyListeners();
+    return _queueWork(() async {
+      await _persist();
+      await _persistNotificationSettings();
+    });
+  }
+
+  Future<void> updateLocale({String? language, String? currency}) async {
+    if (language != null) _language = language;
+    if (currency != null) {
+      _currency = currency;
+      _hasPersistedCurrency = true;
+    }
+    notifyListeners();
+    return _queueWork(() async {
+      await _persist();
+      await _persistUserProfile();
+    });
+  }
+
+  Future<void> updatePreferences({
+    bool? compactView,
+    bool? showWeeklySummary,
+    String? themeLabel,
+    String? startScreen,
+  }) async {
+    if (compactView != null) _compactView = compactView;
+    if (showWeeklySummary != null) _showWeeklySummary = showWeeklySummary;
+    if (themeLabel != null) _themeLabel = themeLabel;
+    if (startScreen != null) _startScreen = startScreen;
+    notifyListeners();
+    return _queueWork(() async {
+      await _persist();
+      await _persistUserProfile();
+    });
+  }
+
+  Future<void> updateSecurity({bool? lockOnLaunch, bool? biometric}) async {
+    if (lockOnLaunch != null) _lockOnLaunch = lockOnLaunch;
+    if (biometric != null) _biometric = biometric;
+    notifyListeners();
+    return _queueWork(() async {
+      await _persist();
+      await _persistUserProfile();
+    });
+  }
+
+  Future<void> _loadFromStorage() async {
+    try {
+      final raw = await _storage.read(_storageKey);
+      if (raw == null || raw.isEmpty) return;
+
+      final map = jsonDecode(raw) as Map<String, dynamic>;
+      _hasPersistedMonthlyBudget = map.containsKey('monthlyBudget');
+      _hasPersistedCurrency = map.containsKey('currency');
+
+      _monthlyBudget = map['monthlyBudget'] as int? ?? _monthlyBudget;
+      _budgetWarningPrimary =
+          map['budgetWarningPrimary'] as int? ?? _budgetWarningPrimary;
+      _budgetWarningSecondary =
+          map['budgetWarningSecondary'] as int? ?? _budgetWarningSecondary;
+      _budgetStartDay = map['budgetStartDay'] as String? ?? _budgetStartDay;
+      _budgetAlert = map['budgetAlert'] as bool? ?? _budgetAlert;
+      _fixedExpenseAlert =
+          map['fixedExpenseAlert'] as bool? ?? _fixedExpenseAlert;
+      _reminderAlert = map['reminderAlert'] as bool? ?? _reminderAlert;
+      _language = map['language'] as String? ?? _language;
+      _currency = map['currency'] as String? ?? _currency;
+      _compactView = map['compactView'] as bool? ?? _compactView;
+      _showWeeklySummary =
+          map['showWeeklySummary'] as bool? ?? _showWeeklySummary;
+      _themeLabel = map['themeLabel'] as String? ?? _themeLabel;
+      _startScreen = map['startScreen'] as String? ?? _startScreen;
+      _lockOnLaunch = map['lockOnLaunch'] as bool? ?? _lockOnLaunch;
+      _biometric = map['biometric'] as bool? ?? _biometric;
+      notifyListeners();
+    } catch (_) {
+      // Keep defaults if local settings are unreadable.
+    }
+  }
+
+  void _schedulePersist() {
+    _pendingWork = _pendingWork.then((_) => _persist());
+  }
+
+  Future<void> _persist() async {
+    try {
+      await _storage.write(
+        _storageKey,
+        jsonEncode(<String, dynamic>{
+          'monthlyBudget': _monthlyBudget,
+          'budgetWarningPrimary': _budgetWarningPrimary,
+          'budgetWarningSecondary': _budgetWarningSecondary,
+          'budgetStartDay': _budgetStartDay,
+          'budgetAlert': _budgetAlert,
+          'fixedExpenseAlert': _fixedExpenseAlert,
+          'reminderAlert': _reminderAlert,
+          'language': _language,
+          'currency': _currency,
+          'compactView': _compactView,
+          'showWeeklySummary': _showWeeklySummary,
+          'themeLabel': _themeLabel,
+          'startScreen': _startScreen,
+          'lockOnLaunch': _lockOnLaunch,
+          'biometric': _biometric,
+        }),
+      );
+    } catch (_) {
+      // The UI remains usable even if persistence fails.
+    }
+  }
+
+  Future<void> _queueWork(Future<void> Function() action) {
+    final future = _pendingWork.then((_) => action());
+    _pendingWork = future.catchError((_) {});
+    return future;
+  }
+
+  void resetForSignedOut() {
+    _resetAccountScopedValues();
+    _user = null;
+    _notificationSetting = null;
+    notifyListeners();
+  }
+
+  void _applyUserSettings(AppUser user) {
+    if (user.monthlyIncome > 0) {
+      _monthlyBudget = user.monthlyIncome;
+    }
+    _currency = user.currency;
+    _language = user.language;
+    _themeLabel = user.themeLabel;
+    _startScreen = user.startScreen;
+    _compactView = user.compactView;
+    _showWeeklySummary = user.showWeeklySummary;
+    _lockOnLaunch = user.lockOnLaunch;
+    _biometric = user.biometricEnabled;
+    _budgetWarningPrimary = user.budgetWarningPrimary;
+    _budgetWarningSecondary = user.budgetWarningSecondary;
+    _budgetStartDay = user.budgetStartDay;
+  }
+
+  void _applyNotificationSettings(NotificationSetting setting) {
+    _budgetAlert = setting.budgetAlertEnabled;
+    _fixedExpenseAlert = setting.fixedExpenseAlertEnabled;
+    _reminderAlert = setting.dailySummaryEnabled;
+  }
+
+  void _resetAccountScopedValues() {
+    _monthlyBudget = 2000000;
+    _budgetWarningPrimary = 80;
+    _budgetWarningSecondary = 100;
+    _budgetStartDay = '매월 1일';
+    _budgetAlert = true;
+    _fixedExpenseAlert = true;
+    _reminderAlert = false;
+    _language = '한국어';
+    _currency = 'KRW';
+    _compactView = false;
+    _showWeeklySummary = true;
+    _themeLabel = '라이트';
+    _startScreen = '홈';
+    _lockOnLaunch = false;
+    _biometric = false;
+    _hasPersistedMonthlyBudget = false;
+    _hasPersistedCurrency = false;
+  }
+
+  Future<void> _persistUserProfile() async {
+    final user = _user;
+    final authRepository = _authRepository;
+    if (user == null || authRepository == null) return;
+
+    _user = await authRepository.updateProfile(
+      user.copyWith(
+        currency: _currency,
+        language: _language,
+        themeLabel: _themeLabel,
+        startScreen: _startScreen,
+        compactView: _compactView,
+        showWeeklySummary: _showWeeklySummary,
+        lockOnLaunch: _lockOnLaunch,
+        biometricEnabled: _biometric,
+        budgetWarningPrimary: _budgetWarningPrimary,
+        budgetWarningSecondary: _budgetWarningSecondary,
+        budgetStartDay: _budgetStartDay,
+      ),
+    );
+  }
+
+  Future<void> _persistNotificationSettings() async {
+    final notificationRepository = _notificationRepository;
+    final user = _user;
+    if (notificationRepository == null || user == null) return;
+
+    final masterEnabled = _budgetAlert || _fixedExpenseAlert || _reminderAlert;
+    final base =
+        _notificationSetting ??
+        NotificationSetting(
+          id: '',
+          userId: user.id,
+          masterEnabled: masterEnabled,
+          budgetAlertEnabled: _budgetAlert,
+          fixedExpenseAlertEnabled: _fixedExpenseAlert,
+          dailySummaryEnabled: _reminderAlert,
+          dailySummaryTime: '20:00',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+
+    _notificationSetting = await notificationRepository.updateSetting(
+      base.copyWith(
+        masterEnabled: masterEnabled,
+        budgetAlertEnabled: _budgetAlert,
+        fixedExpenseAlertEnabled: _fixedExpenseAlert,
+        dailySummaryEnabled: _reminderAlert,
+      ),
+    );
+  }
+
+  String _currentBudgetMonth() {
+    final now = DateTime.now();
+    return '${now.year}-${now.month.toString().padLeft(2, '0')}';
+  }
+}

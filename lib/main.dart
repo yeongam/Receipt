@@ -28,6 +28,7 @@ import 'screens/report/report_screen.dart';
 import 'screens/notification/notification_screen.dart';
 import 'screens/mypage/mypage_screen.dart';
 import 'screens/shared/pin_pad.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -79,9 +80,14 @@ class MissingSupabaseConfigApp extends StatelessWidget {
   }
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     final authRepository = AuthRepository();
@@ -95,14 +101,11 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider(authRepository)),
         ChangeNotifierProvider(
-          create: (_) => CategoryProvider(categoryRepository),
-        ),
+            create: (_) => CategoryProvider(categoryRepository)),
         ChangeNotifierProvider(
-          create: (_) => FixedExpenseProvider(fixedExpenseRepository),
-        ),
+            create: (_) => FixedExpenseProvider(fixedExpenseRepository)),
         ChangeNotifierProvider(
-          create: (_) => TransactionProvider(transactionRepository),
-        ),
+            create: (_) => TransactionProvider(transactionRepository)),
         ChangeNotifierProvider(
           create: (_) => SettingsProvider(
             authRepository: authRepository,
@@ -111,16 +114,34 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ],
-      child: MaterialApp(
-        title: '통합 지출관리',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightTheme,
-        scrollBehavior: _AppScrollBehavior(),
-        builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context).copyWith(textScaler: TextScaler.noScaling),
-          child: child!,
-        ),
-        home: const _RootGate(),
+      child: Consumer<SettingsProvider>(
+        builder: (context, settings, _) {
+          return MaterialApp(
+            title: '통합 지출관리',
+            debugShowCheckedModeBanner: false,
+            scrollBehavior: _AppScrollBehavior(),
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: settings.themeToken == 'dark'
+                ? ThemeMode.dark
+                : ThemeMode.light,
+            locale: Locale(settings.isEnglish ? 'en' : 'ko'),
+            supportedLocales: const [Locale('ko'), Locale('en')],
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            builder: (context, child) {
+              final mq = MediaQuery.of(context);
+              return MediaQuery(
+                data: mq.copyWith(textScaler: TextScaler.noScaling),
+                child: child ?? const SizedBox.shrink(),
+              );
+            },
+            home: const _RootGate(),
+          );
+        },
       ),
     );
   }
@@ -559,6 +580,7 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
+  bool _isLocked = false;
 
   @override
   void initState() {
@@ -566,8 +588,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     _currentIndex = SettingsProvider.navigationIndexFor(
       context.read<SettingsProvider>().startScreen,
     );
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadInitialData();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _loadInitialData();
+      if (!mounted) return;
+      final settings = context.read<SettingsProvider>();
+      if (settings.hasAppLock && settings.lockOnLaunch) {
+        setState(() => _isLocked = true);
+      }
     });
   }
 
@@ -639,6 +666,15 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLocked) {
+      final settings = context.read<SettingsProvider>();
+      return _AppLockScreen(
+        validatePin: settings.validateAppLockPasscode,
+        validateRecoveryCode: settings.validateRecoveryCodeForUnlock,
+        disableAppLock: settings.disableAppLock,
+        onUnlocked: () => setState(() => _isLocked = false),
+      );
+    }
     return Scaffold(
       body: IndexedStack(index: _currentIndex, children: _screens),
       bottomNavigationBar: Container(
