@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/auth/signed_in_user_id.dart';
+import '../../core/utils/amount_format.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../data/models/fixed_expense.dart';
@@ -72,7 +73,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                           Expanded(
                             child: _SummaryCard(
                               label: '이번 달 차감',
-                              value: '${_formatAmount(activeTotal)}원',
+                              value: '${formatAmount(activeTotal)}원',
                               helper: '자동 반영 예정',
                               color: AppColors.expense,
                             ),
@@ -479,7 +480,7 @@ class _FixedExpenseTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '${_formatAmount(amount)}원',
+                  '${formatAmount(amount)}원',
                   style: AppTextStyles.titleSmall.copyWith(
                     color: AppColors.expense,
                     fontWeight: FontWeight.w700,
@@ -494,11 +495,3 @@ class _FixedExpenseTile extends StatelessWidget {
   }
 }
 
-String _formatAmount(int amount) {
-  return amount.toString().replaceAllMapped(
-    RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-    (m) {
-      return '${m[1]},';
-    },
-  );
-}

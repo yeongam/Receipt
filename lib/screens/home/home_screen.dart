@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/amount_format.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../data/models/transaction.dart';
 import '../../providers/settings_provider.dart';
@@ -155,7 +156,7 @@ class _SummaryCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  _formatAmount(expense),
+                  formatAmount(expense),
                   style: AppTextStyles.amount
                       .copyWith(color: Colors.white, fontSize: 34),
                 ),
@@ -173,7 +174,7 @@ class _SummaryCard extends StatelessWidget {
                 _SummaryChip(
                   icon: Icons.arrow_downward_rounded,
                   label: '입금',
-                  amount: '${_formatAmount(income)}원',
+                  amount: '${formatAmount(income)}원',
                   color: AppColors.accent,
                 ),
                 const SizedBox(width: 16),
@@ -182,7 +183,7 @@ class _SummaryCard extends StatelessWidget {
                 _SummaryChip(
                   icon: Icons.account_balance_wallet_outlined,
                   label: '잔액',
-                  amount: '${_formatAmount(balance)}원',
+                  amount: '${formatAmount(balance)}원',
                   color: Colors.white,
                 ),
               ],
@@ -379,9 +380,9 @@ class _BudgetCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(_formatAmount(expense),
+              Text(formatAmount(expense),
                   style: AppTextStyles.amountSmall),
-              Text(' / ${_formatAmount(total)}원', style: AppTextStyles.bodySmall),
+              Text(' / ${formatAmount(total)}원', style: AppTextStyles.bodySmall),
             ],
           ),
           const SizedBox(height: 12),
@@ -488,7 +489,7 @@ class _TransactionTile extends StatelessWidget {
         style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
       ),
       trailing: Text(
-        '$sign${_formatAmount(transaction.amount)}원',
+        '$sign${formatAmount(transaction.amount)}원',
         style: AppTextStyles.titleMedium.copyWith(
           color: color,
           fontWeight: FontWeight.w700,
@@ -498,10 +499,3 @@ class _TransactionTile extends StatelessWidget {
   }
 }
 
-String _formatAmount(int amount) {
-  return amount
-      .toString()
-      .replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (match) {
-    return '${match[1]},';
-  });
-}

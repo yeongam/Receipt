@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/amount_format.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../providers/category_provider.dart';
 import '../../providers/transaction_provider.dart';
@@ -131,7 +132,7 @@ class _DonutChartCard extends StatelessWidget {
         children: [
           const Text('카테고리별 출금', style: AppTextStyles.titleMedium),
           const SizedBox(height: 4),
-          Text('${_formatAmount(totalExpense)}원 출금',
+          Text('${formatAmount(totalExpense)}원 출금',
               style:
                   AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary)),
           const SizedBox(height: 24),
@@ -155,7 +156,7 @@ class _DonutChartCard extends StatelessWidget {
                       Text('총 출금',
                           style: AppTextStyles.bodySmall
                               .copyWith(color: AppColors.textSecondary)),
-                      Text(_formatAmount(totalExpense),
+                      Text(formatAmount(totalExpense),
                           style: AppTextStyles.amountSmall.copyWith(fontSize: 20)),
                       Text('원',
                           style: AppTextStyles.bodySmall
@@ -186,7 +187,7 @@ class _DonutChartCard extends StatelessWidget {
                     child: Text(entry.value.categoryName, style: AppTextStyles.bodySmall),
                   ),
                   Text(
-                    '${_formatAmount(entry.value.amount)}원',
+                    '${formatAmount(entry.value.amount)}원',
                     style: AppTextStyles.bodySmall,
                   ),
                   const SizedBox(width: 8),
@@ -304,8 +305,8 @@ class _ComparisonCard extends StatelessWidget {
             previousExpense == 0
                 ? '이전 달 데이터가 아직 없어요.'
                 : savedMore
-                    ? '지난달보다 ${_formatAmount(difference)}원 적게 썼어요.'
-                    : '지난달보다 ${_formatAmount(difference.abs())}원 더 썼어요.',
+                    ? '지난달보다 ${formatAmount(difference)}원 적게 썼어요.'
+                    : '지난달보다 ${formatAmount(difference.abs())}원 더 썼어요.',
             style: AppTextStyles.bodySmall.copyWith(
               color: savedMore ? AppColors.accent : AppColors.expense,
               fontWeight: FontWeight.w600,
@@ -405,10 +406,3 @@ class _MonthlyTrendTab extends StatelessWidget {
   }
 }
 
-String _formatAmount(int amount) {
-  return amount
-      .toString()
-      .replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (match) {
-    return '${match[1]},';
-  });
-}

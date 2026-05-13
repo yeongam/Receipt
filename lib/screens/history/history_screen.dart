@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/supabase/supabase_config.dart';
+import '../../core/utils/amount_format.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../data/models/transaction.dart';
@@ -89,15 +90,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: Row(
               children: [
-                _MiniStat(label: '입금', amount: _formatAmount(income), color: AppColors.accent),
+                _MiniStat(label: '입금', amount: formatAmount(income), color: AppColors.accent),
                 const SizedBox(width: 16),
                 Container(width: 1, height: 32, color: AppColors.border),
                 const SizedBox(width: 16),
-                _MiniStat(label: '출금', amount: _formatAmount(expense), color: AppColors.expense),
+                _MiniStat(label: '출금', amount: formatAmount(expense), color: AppColors.expense),
                 const SizedBox(width: 16),
                 Container(width: 1, height: 32, color: AppColors.border),
                 const SizedBox(width: 16),
-                _MiniStat(label: '잔액', amount: _formatAmount(balance), color: AppColors.primary),
+                _MiniStat(label: '잔액', amount: formatAmount(balance), color: AppColors.primary),
               ],
             ),
           ),
@@ -213,7 +214,7 @@ class _DateGroup extends StatelessWidget {
             children: [
               Text(date, style: AppTextStyles.labelMedium),
               Text(
-                '${isPositive ? '+' : '-'}${_formatAmount(dailyTotal.abs())}원',
+                '${isPositive ? '+' : '-'}${formatAmount(dailyTotal.abs())}원',
                 style: AppTextStyles.labelMedium.copyWith(
                   color: isPositive ? AppColors.accent : AppColors.expense,
                   fontWeight: FontWeight.w600,
@@ -273,7 +274,7 @@ class _DateGroup extends StatelessWidget {
                           .copyWith(color: AppColors.textSecondary),
                     ),
                     trailing: Text(
-                      '${transaction.isIncome ? '+' : '-'}${_formatAmount(transaction.amount)}원',
+                      '${transaction.isIncome ? '+' : '-'}${formatAmount(transaction.amount)}원',
                       style: AppTextStyles.titleSmall.copyWith(
                         color: color,
                         fontWeight: FontWeight.w700,
@@ -292,10 +293,3 @@ class _DateGroup extends StatelessWidget {
   }
 }
 
-String _formatAmount(int amount) {
-  return amount
-      .toString()
-      .replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (match) {
-    return '${match[1]},';
-  });
-}
