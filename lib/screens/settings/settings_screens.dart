@@ -176,7 +176,7 @@ class AlertSettingsScreen extends StatelessWidget {
           },
         ),
         _SwitchCard(
-          title: '기록 리마인더',
+          title: '일일 요약 알림',
           subtitle: '하루를 마감하기 전에 입력을 잊지 않게 도와줘요.',
           value: settings.reminderAlert,
           onChanged: (value) {

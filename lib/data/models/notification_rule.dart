@@ -45,4 +45,30 @@ class NotificationRule {
       'remind_at': remindAt,
     };
   }
+
+  Map<String, dynamic> toUpdateMap() {
+    return {
+      'is_enabled': isEnabled,
+      'remind_days_before': remindDaysBefore,
+      'remind_at': remindAt,
+    };
+  }
+
+  NotificationRule copyWith({
+    bool? isEnabled,
+    int? remindDaysBefore,
+    String? remindAt,
+  }) {
+    return NotificationRule(
+      id: id,
+      userId: userId,
+      fixedExpenseId: fixedExpenseId,
+      title: title,
+      isEnabled: isEnabled ?? this.isEnabled,
+      remindDaysBefore: remindDaysBefore ?? this.remindDaysBefore,
+      remindAt: remindAt ?? this.remindAt,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+    );
+  }
 }

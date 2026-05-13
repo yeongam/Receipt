@@ -6,6 +6,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../data/models/fixed_expense.dart';
 import '../../providers/fixed_expense_provider.dart';
+import '../../providers/notification_rule_provider.dart';
 
 class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});
@@ -18,6 +19,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<FixedExpenseProvider>();
+    final ruleProvider = context.watch<NotificationRuleProvider>();
     final items = provider.items;
     final activeItems = provider.activeItems;
     final activeTotal = activeItems.fold<int>(0, (sum, e) => sum + e.amount);
@@ -141,6 +143,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                         updatedAt: fe.updatedAt,
                                       ),
                                     );
+                                    // Mirror the active state to the notification rule.
+                                    await ruleProvider.setEnabled(fe.id, value);
                                   },
                                 ),
                               ),
@@ -258,14 +262,21 @@ class _FixedExpenseEntrySheetState extends State<_FixedExpenseEntrySheet> {
                     return;
                   }
 
-                  await context.read<FixedExpenseProvider>().add(
+                  final title = _titleController.text.trim();
+                  final created = await context.read<FixedExpenseProvider>().add(
                     createFixedExpenseDraft(
                       userId: userId,
-                      title: _titleController.text.trim(),
+                      title: title,
                       amount: amount,
                       billingDay: billingDay,
                       cycle: _cycle,
                     ),
+                  );
+                  if (!context.mounted) return;
+                  await context.read<NotificationRuleProvider>().createForExpense(
+                    userId: userId,
+                    fixedExpenseId: created.id,
+                    title: title,
                   );
                   if (!context.mounted) return;
                   Navigator.of(context).pop();

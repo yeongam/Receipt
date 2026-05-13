@@ -358,13 +358,26 @@ class SettingsProvider extends ChangeNotifier {
     bool? fixedExpenseAlert,
     bool? reminderAlert,
   }) async {
+    // Snapshot previous values for rollback on failure.
+    final prevBudgetAlert = _budgetAlert;
+    final prevFixedExpenseAlert = _fixedExpenseAlert;
+    final prevReminderAlert = _reminderAlert;
+
     if (budgetAlert != null) _budgetAlert = budgetAlert;
     if (fixedExpenseAlert != null) _fixedExpenseAlert = fixedExpenseAlert;
     if (reminderAlert != null) _reminderAlert = reminderAlert;
     notifyListeners();
     return _queueWork(() async {
-      await _persist();
-      await _persistNotificationSettings();
+      try {
+        await _persist();
+        await _persistNotificationSettings();
+      } catch (e) {
+        _budgetAlert = prevBudgetAlert;
+        _fixedExpenseAlert = prevFixedExpenseAlert;
+        _reminderAlert = prevReminderAlert;
+        notifyListeners();
+        rethrow;
+      }
     });
   }
 

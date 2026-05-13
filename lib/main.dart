@@ -19,6 +19,7 @@ import 'data/repositories/transaction_repository.dart';
 import 'providers/auth_provider.dart';
 import 'providers/category_provider.dart';
 import 'providers/fixed_expense_provider.dart';
+import 'providers/notification_rule_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/transaction_provider.dart';
 import 'screens/auth/login_screen.dart';
@@ -118,6 +119,9 @@ class _MyAppState extends State<MyApp> {
             notificationRepository: _notificationRepository,
           ),
         ),
+        ChangeNotifierProvider(
+          create: (_) => NotificationRuleProvider(_notificationRepository),
+        ),
       ],
       child: Consumer<SettingsProvider>(
         builder: (context, settings, _) {
@@ -184,6 +188,7 @@ class _RootGateState extends State<_RootGate> {
         context.read<TransactionProvider>().clear();
         context.read<CategoryProvider>().clear();
         context.read<FixedExpenseProvider>().clear();
+        context.read<NotificationRuleProvider>().clear();
         context.read<SettingsProvider>().resetForSignedOut();
         setState(() => _stage = _Stage.login);
       });
@@ -561,6 +566,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       transactionProvider.loadMonthlyTrends(userId).catchError((Object _) {}),
       categoryProvider.load(userId).catchError((Object _) {}),
       fixedExpenseProvider.load(userId).catchError((Object _) {}),
+      context.read<NotificationRuleProvider>().load(userId).catchError((Object _) {}),
     ]);
 
     if (!mounted) return;
@@ -588,11 +594,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     if (granted && mounted) {
       final notificationSetting = settingsProvider.notificationSetting;
       final fixedExpenses = context.read<FixedExpenseProvider>().items;
+      final rules = context.read<NotificationRuleProvider>().rules;
       if (notificationSetting != null) {
         await notificationService.syncSchedules(
           setting: notificationSetting,
           activeFixedExpenses: fixedExpenses,
           isEnglish: settingsProvider.isEnglish,
+          rules: rules,
         );
       }
     }

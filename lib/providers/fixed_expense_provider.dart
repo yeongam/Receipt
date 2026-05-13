@@ -30,11 +30,12 @@ class FixedExpenseProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> add(FixedExpense fe) async {
+  Future<FixedExpense> add(FixedExpense fe) async {
     _ensureUserId(fe.userId);
     final created = await _repo.insert(fe);
     _items.add(created);
     notifyListeners();
+    return created;
   }
 
   Future<void> edit(FixedExpense fe) async {

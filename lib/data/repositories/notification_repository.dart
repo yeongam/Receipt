@@ -49,6 +49,16 @@ class NotificationRepository {
     return NotificationRule.fromMap(data);
   }
 
+  Future<NotificationRule> updateRule(NotificationRule rule) async {
+    final data = await _client
+        .from('notification_rules')
+        .update(rule.toUpdateMap())
+        .eq('id', rule.id)
+        .select()
+        .single();
+    return NotificationRule.fromMap(data);
+  }
+
   Future<void> deleteRule(String id) async {
     await _client.from('notification_rules').delete().eq('id', id);
   }

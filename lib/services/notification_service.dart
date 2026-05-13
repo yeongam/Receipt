@@ -5,6 +5,7 @@ import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
 import '../data/models/fixed_expense.dart';
+import '../data/models/notification_rule.dart';
 import '../data/models/notification_setting.dart';
 
 class NotificationService {
@@ -76,16 +77,19 @@ class NotificationService {
   Future<void> _syncFuture = Future.value();
 
   /// Reschedules all local notifications based on Supabase settings + fixed expenses.
+  /// [rules] provides per-expense is_enabled / remindDaysBefore / remindAt overrides.
   Future<void> syncSchedules({
     required NotificationSetting setting,
     required List<FixedExpense> activeFixedExpenses,
     required bool isEnglish,
+    List<NotificationRule> rules = const [],
   }) {
     _syncFuture = _syncFuture.then(
       (_) => _doSyncSchedules(
         setting: setting,
         activeFixedExpenses: activeFixedExpenses,
         isEnglish: isEnglish,
+        rules: rules,
       ),
     );
     return _syncFuture;
@@ -95,6 +99,7 @@ class NotificationService {
     required NotificationSetting setting,
     required List<FixedExpense> activeFixedExpenses,
     required bool isEnglish,
+    List<NotificationRule> rules = const [],
   }) async {
     await initialize();
     await _plugin.cancelAll();
@@ -110,6 +115,7 @@ class NotificationService {
       await _scheduleFixedExpenseAlerts(
         expenses: activeFixedExpenses,
         isEnglish: isEnglish,
+        rules: rules,
       );
     }
   }
@@ -143,10 +149,19 @@ class NotificationService {
   Future<void> _scheduleFixedExpenseAlerts({
     required List<FixedExpense> expenses,
     required bool isEnglish,
+    List<NotificationRule> rules = const [],
   }) async {
     var id = _fixedExpenseIdStart;
     // Only schedule monthly fixed expenses (cycle == 'monthly')
     for (final expense in expenses.where((e) => e.isActive && e.cycle == 'monthly')) {
+      // Per-expense rule overrides: is_enabled, remindDaysBefore, remindAt.
+      // Falls back to defaults (enabled, 1 day before, 09:00) if no rule exists.
+      final rule = rules.where((r) => r.fixedExpenseId == expense.id).firstOrNull;
+      if (rule != null && !rule.isEnabled) continue;
+
+      final remindDaysBefore = rule?.remindDaysBefore ?? 1;
+      final remindAt = rule?.remindAt ?? '09:00';
+
       for (var monthOffset = 0; monthOffset < 6; monthOffset++) {
         // Guard against hitting the device alarm limit (L-4).
         if (id >= _fixedExpenseIdMax) {
@@ -160,6 +175,8 @@ class NotificationService {
           final scheduledDate = _fixedExpenseAlertDate(
             dueDay: expense.billingDay,
             monthOffset: monthOffset,
+            remindDaysBefore: remindDaysBefore,
+            remindAt: remindAt,
           );
           if (scheduledDate.isBefore(tz.TZDateTime.now(tz.local))) continue;
 
@@ -167,8 +184,8 @@ class NotificationService {
             id++,
             isEnglish ? 'Upcoming fixed expense' : '고정지출 예정 알림',
             isEnglish
-                ? '${expense.title} will be deducted tomorrow.'
-                : '${expense.title} 항목이 내일 자동 반영될 예정이에요.',
+                ? '${expense.title} will be deducted in $remindDaysBefore day(s).'
+                : '${expense.title} 항목이 $remindDaysBefore일 후 자동 반영될 예정이에요.',
             scheduledDate,
             _notificationDetails(),
             androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
@@ -208,6 +225,8 @@ class NotificationService {
   tz.TZDateTime _fixedExpenseAlertDate({
     required int dueDay,
     required int monthOffset,
+    int remindDaysBefore = 1,
+    String remindAt = '09:00',
   }) {
     final now = tz.TZDateTime.now(tz.local);
     // Use Dart's DateTime for overflow-safe month arithmetic (month > 12
@@ -216,13 +235,17 @@ class NotificationService {
     final rawLastDay = DateTime(rawTarget.year, rawTarget.month + 1, 0);
     final lastDay = rawLastDay.day;
     final normalizedDay = dueDay.clamp(1, lastDay);
+    final parts = remindAt.split(':');
+    final hour = int.tryParse(parts.first) ?? 9;
+    final minute = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
     final dueDate = tz.TZDateTime(
       tz.local,
       rawTarget.year,
       rawTarget.month,
       normalizedDay,
-      9,
+      hour,
+      minute,
     );
-    return dueDate.subtract(const Duration(days: 1));
+    return dueDate.subtract(Duration(days: remindDaysBefore));
   }
 }
