@@ -162,10 +162,10 @@ class _RootGate extends StatefulWidget {
   State<_RootGate> createState() => _RootGateState();
 }
 
-enum _Stage { intro, login, signup, main }
+enum _Stage { loading, intro, login, signup, main }
 
 class _RootGateState extends State<_RootGate> {
-  _Stage _stage = _Stage.intro;
+  _Stage _stage = _Stage.loading;
 
   void _moveTo(_Stage stage) => setState(() => _stage = stage);
 
@@ -173,25 +173,37 @@ class _RootGateState extends State<_RootGate> {
   Widget build(BuildContext context) {
     final authStatus = context.watch<AuthProvider>().status;
 
+    if (authStatus == AuthStatus.unknown) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     if (authStatus == AuthStatus.authenticated && _stage != _Stage.main) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() => _stage = _Stage.main);
       });
     }
 
-    if (authStatus == AuthStatus.unauthenticated && _stage == _Stage.main) {
+    if (authStatus == AuthStatus.unauthenticated &&
+        (_stage == _Stage.main || _stage == _Stage.loading)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        context.read<TransactionProvider>().clear();
-        context.read<CategoryProvider>().clear();
-        context.read<FixedExpenseProvider>().clear();
-        context.read<NotificationRuleProvider>().clear();
-        context.read<SettingsProvider>().resetForSignedOut();
-        setState(() => _stage = _Stage.login);
+        if (_stage == _Stage.main) {
+          context.read<TransactionProvider>().clear();
+          context.read<CategoryProvider>().clear();
+          context.read<FixedExpenseProvider>().clear();
+          context.read<NotificationRuleProvider>().clear();
+          context.read<SettingsProvider>().resetForSignedOut();
+        }
+        setState(() => _stage = _Stage.intro);
       });
     }
 
     return switch (_stage) {
+      _Stage.loading => const Scaffold(
+          body: Center(child: CircularProgressIndicator()),
+        ),
       _Stage.intro => IntroScreen(onStart: () => _moveTo(_Stage.login)),
       _Stage.login => LoginScreen(
         onLogin: () => _moveTo(_Stage.main),

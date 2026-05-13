@@ -90,7 +90,8 @@ class _RecoveryFormState extends State<_RecoveryForm> {
 
       if (!mounted) return;
 
-      final data = response.data as Map<String, dynamic>?;
+      final raw = response.data;
+      final data = raw is Map<String, dynamic> ? raw : null;
       if (data?['success'] == true) {
         _showSuccess();
       } else {
@@ -296,8 +297,8 @@ class _Header extends StatelessWidget {
               children: [
                 Text(
                   context.tr(
-                    verified ? '복구 코드 확인 완료' : '비밀번호 재설정',
-                    verified ? 'Identity Verified' : 'Reset Password',
+                    verified ? '새 비밀번호 설정' : '비밀번호 재설정',
+                    verified ? 'Set New Password' : 'Reset Password',
                   ),
                   style: AppTextStyles.titleLarge
                       .copyWith(fontWeight: FontWeight.w700),
@@ -306,10 +307,10 @@ class _Header extends StatelessWidget {
                 Text(
                   context.tr(
                     verified
-                        ? '새 비밀번호를 설정해 주세요.'
+                        ? '새 비밀번호를 입력해 주세요.'
                         : '아이디와 복구 코드를 입력하세요.',
                     verified
-                        ? 'Set your new password below.'
+                        ? 'Enter your new password below.'
                         : 'Enter your username and recovery code.',
                   ),
                   style: AppTextStyles.bodySmall.copyWith(

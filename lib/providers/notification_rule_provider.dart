@@ -59,7 +59,11 @@ class NotificationRuleProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void removeForExpense(String fixedExpenseId) {
+  Future<void> removeForExpense(String fixedExpenseId) async {
+    final rule = ruleFor(fixedExpenseId);
+    if (rule != null) {
+      await _repo.deleteRule(rule.id);
+    }
     _rules.removeWhere((r) => r.fixedExpenseId == fixedExpenseId);
     notifyListeners();
   }

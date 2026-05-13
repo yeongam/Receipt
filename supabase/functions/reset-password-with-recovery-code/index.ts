@@ -1,31 +1,20 @@
-/**
- * Edge Function: reset-password-with-recovery-code
- *
- * Validates username + PBKDF2 recovery code, then resets the Supabase auth
- * password using the service role key (never exposed to the client).
- *
- * Request body (JSON):
- *   { username: string, recoveryCode: string, newPassword: string }
- *
- * Responses:
- *   200 { success: true }
- *   400 { error: "invalid_credentials" | "invalid_input" }
- *   500 { error: "internal_error" }
- */
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 const PBKDF2_ITERATIONS = 50_000;
-const PBKDF2_KEY_LENGTH = 32; // bytes
+const PBKDF2_KEY_LENGTH = 32;
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_MINUTES = 30;
+
+const ALLOWED_ORIGIN = SUPABASE_URL;
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, {
       headers: {
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
         'Access-Control-Allow-Headers': 'authorization, content-type',
       },
     });
@@ -54,7 +43,18 @@ Deno.serve(async (req: Request) => {
     auth: { persistSession: false },
   });
 
-  // 1. Look up the user record by username.
+  // 1. Check server-side rate limit.
+  const { data: attemptRow } = await admin
+    .from('password_reset_attempts')
+    .select('attempt_count, locked_until')
+    .eq('username', username)
+    .maybeSingle();
+
+  if (attemptRow?.locked_until && new Date(attemptRow.locked_until) > new Date()) {
+    return json({ error: 'too_many_attempts' }, 429);
+  }
+
+  // 2. Look up the user record by username.
   const { data: userRow, error: fetchErr } = await admin
     .from('users')
     .select('id, app_lock_recovery_code')
@@ -62,17 +62,25 @@ Deno.serve(async (req: Request) => {
     .maybeSingle();
 
   if (fetchErr || !userRow || !userRow.app_lock_recovery_code) {
+    await recordFailedAttempt(admin, username, attemptRow);
     return json({ error: 'invalid_credentials' }, 400);
   }
 
-  // 2. Validate recovery code.
+  // 3. Validate recovery code.
   const stored: string = userRow.app_lock_recovery_code;
   const valid = await validateRecoveryCode(recoveryCode, stored);
   if (!valid) {
+    await recordFailedAttempt(admin, username, attemptRow);
     return json({ error: 'invalid_credentials' }, 400);
   }
 
-  // 3. Reset Supabase auth password via admin API.
+  // 4. Clear rate limit on success.
+  await admin
+    .from('password_reset_attempts')
+    .delete()
+    .eq('username', username);
+
+  // 5. Reset Supabase auth password via admin API.
   const { error: resetErr } = await admin.auth.admin.updateUserById(
     userRow.id,
     { password: newPassword },
@@ -86,10 +94,31 @@ Deno.serve(async (req: Request) => {
   return json({ success: true }, 200);
 });
 
+async function recordFailedAttempt(
+  admin: ReturnType<typeof createClient>,
+  username: string,
+  existing: { attempt_count: number; locked_until: string | null } | null,
+) {
+  const count = (existing?.attempt_count ?? 0) + 1;
+  const lockedUntil = count >= MAX_ATTEMPTS
+    ? new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000).toISOString()
+    : null;
+
+  await admin.from('password_reset_attempts').upsert(
+    {
+      username,
+      attempt_count: count,
+      locked_until: lockedUntil,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'username' },
+  );
+}
+
 /**
  * Validates a recovery code against either:
- *   pbkdf2rc:<base64-salt>:<base64-hash>  (current format, 50 000 iterations)
- *   sha256:<hex-hash>                      (legacy format)
+ *   pbkdf2rc:<hex-salt>:<hex-hash>  (current format, 50 000 iterations)
+ *   sha256:<hex-hash>               (legacy format)
  */
 async function validateRecoveryCode(
   input: string,
@@ -98,8 +127,8 @@ async function validateRecoveryCode(
   if (stored.startsWith('pbkdf2rc:')) {
     const parts = stored.split(':');
     if (parts.length !== 3) return false;
-    const salt = base64Decode(parts[1]);
-    const expectedHash = base64Decode(parts[2]);
+    const salt = hexDecode(parts[1]);
+    const expectedHash = hexDecode(parts[2]);
 
     const keyMaterial = await crypto.subtle.importKey(
       'raw',
@@ -139,14 +168,14 @@ async function validateRecoveryCode(
   return false;
 }
 
-function base64Decode(b64: string): Uint8Array {
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+function hexDecode(hex: string): Uint8Array {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = parseInt(hex.substring(i * 2, i * 2 + 2), 16);
+  }
   return bytes;
 }
 
-/** Constant-time comparison to prevent timing attacks. */
 function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
   if (a.length !== b.length) return false;
   let diff = 0;
@@ -159,7 +188,7 @@ function json(body: unknown, status: number): Response {
     status,
     headers: {
       'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
     },
   });
 }

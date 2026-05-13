@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/supabase/supabase_config.dart';
 import '../models/app_user.dart';
@@ -35,14 +36,19 @@ class AuthRepository {
 
     final userId = user.id;
 
-    await Future.delayed(const Duration(milliseconds: 500));
-
     try {
       await _client
           .rpc('seed_default_categories', params: {'p_user_id': userId});
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[AuthRepository] seed_default_categories failed: $e');
+    }
 
-    final profile = await fetchProfile(userId);
+    AppUser? profile;
+    for (var i = 0; i < 3; i++) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      profile = await fetchProfile(userId);
+      if (profile != null) break;
+    }
     if (profile == null) {
       throw Exception('프로필 생성에 실패했습니다. SQL 마이그레이션이 실행됐는지 확인하세요.');
     }

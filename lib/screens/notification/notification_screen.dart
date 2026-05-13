@@ -36,7 +36,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
           ),
         ],
       ),
-      body: provider.isLoading
+      body: provider.isLoading || ruleProvider.isLoading
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
@@ -262,8 +262,12 @@ class _FixedExpenseEntrySheetState extends State<_FixedExpenseEntrySheet> {
                   }
 
                   final title = _titleController.text.trim();
-                  final created = await context.read<FixedExpenseProvider>().add(
-                    createFixedExpenseDraft(
+                  final fixedExpenseProvider =
+                      context.read<FixedExpenseProvider>();
+                  final ruleProvider =
+                      context.read<NotificationRuleProvider>();
+                  final created = await fixedExpenseProvider.add(
+                    _createFixedExpenseDraft(
                       userId: userId,
                       title: title,
                       amount: amount,
@@ -272,11 +276,21 @@ class _FixedExpenseEntrySheetState extends State<_FixedExpenseEntrySheet> {
                     ),
                   );
                   if (!context.mounted) return;
-                  await context.read<NotificationRuleProvider>().createForExpense(
-                    userId: userId,
-                    fixedExpenseId: created.id,
-                    title: title,
-                  );
+                  try {
+                    await ruleProvider.createForExpense(
+                      userId: userId,
+                      fixedExpenseId: created.id,
+                      title: title,
+                    );
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('알림 규칙 생성에 실패했습니다. 나중에 다시 시도해 주세요.'),
+                        ),
+                      );
+                    }
+                  }
                   if (!context.mounted) return;
                   Navigator.of(context).pop();
                 },
@@ -290,7 +304,7 @@ class _FixedExpenseEntrySheetState extends State<_FixedExpenseEntrySheet> {
   }
 }
 
-FixedExpense createFixedExpenseDraft({
+FixedExpense _createFixedExpenseDraft({
   required String userId,
   required String title,
   required int amount,

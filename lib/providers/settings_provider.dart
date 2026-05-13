@@ -134,15 +134,15 @@ class SettingsProvider extends ChangeNotifier {
       final parts = stored.split(':');
       if (parts.length != 3) return false;
       final derived = await compute(_doPbkdf2, [passcode, parts[1]]);
-      return derived == parts[2];
+      return _timingSafeEquals(derived, parts[2]);
     }
     if (stored.contains(':')) {
       final idx = stored.indexOf(':');
       final salt = stored.substring(0, idx);
       final hash = stored.substring(idx + 1);
-      return _sha256(salt + passcode) == hash;
+      return _timingSafeEquals(_sha256(salt + passcode), hash);
     }
-    return _sha256(passcode) == stored;
+    return _timingSafeEquals(_sha256(passcode), stored);
   }
 
   Future<bool> validateRecoveryCodeForUnlock(String code) async {
@@ -152,9 +152,9 @@ class SettingsProvider extends ChangeNotifier {
       final parts = stored.split(':');
       if (parts.length != 3) return false;
       final derived = await compute(_doPbkdf2, [code, parts[1]]);
-      return derived == parts[2];
+      return _timingSafeEquals(derived, parts[2]);
     }
-    return _sha256(code) == stored;
+    return _timingSafeEquals(_sha256(code), stored);
   }
 
   Future<void> disableAppLock() {
@@ -200,6 +200,17 @@ class SettingsProvider extends ChangeNotifier {
   static String _sha256(String input) {
     final bytes = utf8.encode(input);
     return sha256.convert(bytes).toString();
+  }
+
+  static bool _timingSafeEquals(String a, String b) {
+    final ab = utf8.encode(a);
+    final bb = utf8.encode(b);
+    if (ab.length != bb.length) return false;
+    var diff = 0;
+    for (var i = 0; i < ab.length; i++) {
+      diff |= ab[i] ^ bb[i];
+    }
+    return diff == 0;
   }
 
   static const int _pbkdf2Iterations = 50000;

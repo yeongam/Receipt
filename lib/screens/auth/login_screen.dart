@@ -23,7 +23,6 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _idCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
-  bool _keepLoggedIn = true;
   bool _isLoading = false;
 
   @override
@@ -112,33 +111,20 @@ class _LoginScreenState extends State<LoginScreen> {
                         obscureText: true,
                       ),
                       const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Checkbox(
-                            value: _keepLoggedIn,
-                            onChanged: (value) {
-                              setState(() => _keepLoggedIn = value ?? false);
-                            },
-                            activeColor: AppColors.primary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(4),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const AccountRecoveryScreen(),
                             ),
                           ),
-                          const Text('자동 로그인', style: AppTextStyles.bodySmall),
-                          const Spacer(),
-                          TextButton(
-                            onPressed: () => Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => const AccountRecoveryScreen(),
-                              ),
-                            ),
-                            child: Text(
-                              '비밀번호 재설정',
-                              style: AppTextStyles.caption
-                                  .copyWith(color: AppColors.textSecondary),
-                            ),
+                          child: Text(
+                            '비밀번호 재설정',
+                            style: AppTextStyles.caption
+                                .copyWith(color: AppColors.textSecondary),
                           ),
-                        ],
+                        ),
                       ),
                       const SizedBox(height: 12),
                       SizedBox(
