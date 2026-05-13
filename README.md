@@ -31,23 +31,26 @@ cd ios && pod install && cd ..
 ### 2단계 — 환경 변수 설정
 
 Supabase 키는 소스에 포함되지 않으므로 로컬에 `.env` 파일이 필요합니다.
-팀장에게 실제 값을 받아 아래와 같이 설정하세요.
+팀장에게 실제 값을 받아 프로젝트 루트에 아래 형식으로 생성하세요.
 
-```bash
-cp .env.example .env
-# .env 파일을 열고 실제 SUPABASE_URL, SUPABASE_ANON_KEY 입력
+```
+SUPABASE_URL=https://your-project-id.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
 ```
 
-> 같은 Supabase 프로젝트를 공유하는 경우, 값은 팀 내 공유 채널(Slack, 노션 등)에서 받으세요.
 > `.env` 파일은 git에 포함되지 않으므로 직접 생성해야 합니다.
 
 ### 3단계 — 실행
+
+**터미널:**
 
 ```bash
 flutter run --dart-define-from-file=.env
 ```
 
-IDE(VS Code / Android Studio)에서 실행 시 `--dart-define-from-file=.env` 인수를 launch 설정에 추가하세요.
+**VS Code:** `.vscode/launch.json`이 이미 설정되어 있으므로 F5(Run)로 바로 실행할 수 있습니다.
+
+**Android Studio / IntelliJ:** Run Configuration → Additional run args에 `--dart-define-from-file=.env` 추가.
 
 ---
 
@@ -62,11 +65,14 @@ Supabase 대시보드 → SQL Editor에서 아래 파일을 순서대로 실행:
 ```
 supabase/migrations/20260429000000_initial_schema.sql
 supabase/migrations/20260429100000_persist_app_settings.sql
-supabase/migrations/20260506_add_app_lock_columns.sql
-supabase/migrations/20260506_add_transactions_index.sql
-supabase/migrations/20260513_add_category_index.sql
-supabase/migrations/20260513_recovery_code_rpc.sql
-supabase/migrations/20260513_username_auth.sql
+supabase/migrations/20260506000000_add_app_lock_columns.sql
+supabase/migrations/20260506100000_add_transactions_index.sql
+supabase/migrations/20260513000000_add_category_index.sql
+supabase/migrations/20260513100100_password_reset_rate_limit.sql
+supabase/migrations/20260513100200_recovery_code_rpc.sql
+supabase/migrations/20260513100300_username_auth.sql
+supabase/migrations/20260513200000_add_missing_columns.sql
+supabase/migrations/20260513300000_add_user_id_indexes.sql
 ```
 
 ### Edge Function 배포
