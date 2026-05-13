@@ -11,8 +11,8 @@ TransactionMonthQueryRange buildMonthQueryRange(String month) {
   final parts = month.split('-');
   final year = int.parse(parts[0]);
   final mon = int.parse(parts[1]);
-  final startUtc = DateTime(year, mon, 1).toUtc();
-  final endExclusiveUtc = DateTime(year, mon + 1, 1).toUtc();
+  final startUtc = DateTime.utc(year, mon, 1);
+  final endExclusiveUtc = DateTime.utc(year, mon + 1, 1);
   return (startUtc: startUtc, endExclusiveUtc: endExclusiveUtc);
 }
 

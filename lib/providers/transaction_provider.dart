@@ -30,6 +30,7 @@ class TransactionProvider extends ChangeNotifier {
   final TransactionRepository _repo;
 
   final Map<String, List<AppTransaction>> _transactionsByMonth = {};
+  final Map<String, AppTransaction> _transactionById = {};
   bool _isLoading = false;
   DateTime _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
   List<MonthlyTrend> _monthlyTrends = [];
@@ -60,7 +61,11 @@ class TransactionProvider extends ChangeNotifier {
     notifyListeners();
     try {
       final key = _monthKey(normalizedMonth);
-      _transactionsByMonth[key] = await _repo.fetchByMonth(userId, key);
+      final fetched = await _repo.fetchByMonth(userId, key);
+      _transactionsByMonth[key] = fetched;
+      for (final tx in fetched) {
+        _transactionById[tx.id] = tx;
+      }
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -83,10 +88,8 @@ class TransactionProvider extends ChangeNotifier {
     final now = DateTime.now();
     final futures = List.generate(count, (i) {
       final monthOffset = count - 1 - i;
-      final year = now.year + ((now.month - monthOffset - 1) ~/ 12);
-      final month = ((now.month - monthOffset - 1) % 12 + 12) % 12 + 1;
-      final dt = DateTime(year, month);
-      final key = '$year-${month.toString().padLeft(2, '0')}';
+      final dt = DateTime(now.year, now.month - monthOffset);
+      final key = '${dt.year}-${dt.month.toString().padLeft(2, '0')}';
       return _repo.fetchByMonth(userId, key).then((txs) {
         final income =
             txs.where((t) => t.isIncome).fold(0, (sum, t) => sum + t.amount);
@@ -190,6 +193,7 @@ class TransactionProvider extends ChangeNotifier {
 
   void clear() {
     _transactionsByMonth.clear();
+    _transactionById.clear();
     _monthlyTrends = [];
     _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
     notifyListeners();
@@ -204,16 +208,7 @@ class TransactionProvider extends ChangeNotifier {
     }
   }
 
-  AppTransaction? _findById(String id) {
-    for (final items in _transactionsByMonth.values) {
-      final match =
-          items.where((transaction) => transaction.id == id).firstOrNull;
-      if (match != null) {
-        return match;
-      }
-    }
-    return null;
-  }
+  AppTransaction? _findById(String id) => _transactionById[id];
 
   void _upsertIntoMonthCache(AppTransaction transaction) {
     final key = _monthKey(transaction.occurredAt);
@@ -223,6 +218,7 @@ class TransactionProvider extends ChangeNotifier {
     items.add(transaction);
     items.sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
     _transactionsByMonth[key] = items;
+    _transactionById[transaction.id] = transaction;
   }
 
   void _removeFromMonthCache(String id, DateTime month) {
@@ -230,6 +226,7 @@ class TransactionProvider extends ChangeNotifier {
     final items = _transactionsByMonth[key];
     if (items == null) return;
     items.removeWhere((transaction) => transaction.id == id);
+    _transactionById.remove(id);
     if (items.isEmpty) {
       _transactionsByMonth.remove(key);
       return;

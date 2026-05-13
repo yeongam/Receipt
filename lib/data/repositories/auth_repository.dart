@@ -44,8 +44,8 @@ class AuthRepository {
     }
 
     AppUser? profile;
-    for (var i = 0; i < 3; i++) {
-      await Future.delayed(const Duration(milliseconds: 300));
+    for (var i = 0; i < 5; i++) {
+      await Future.delayed(Duration(milliseconds: 200 * (1 << i)));
       profile = await fetchProfile(userId);
       if (profile != null) break;
     }

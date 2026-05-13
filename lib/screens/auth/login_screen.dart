@@ -48,7 +48,9 @@ class _LoginScreenState extends State<LoginScreen> {
     if (ok) {
       widget.onLogin();
     } else {
-      final err = context.read<AuthProvider>().errorMessage ?? '로그인 실패';
+      final authProvider = context.read<AuthProvider>();
+      final err = authProvider.errorMessage ?? '로그인 실패';
+      authProvider.clearError();
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(err)));
     }

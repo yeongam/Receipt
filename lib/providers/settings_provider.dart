@@ -205,10 +205,12 @@ class SettingsProvider extends ChangeNotifier {
   static bool _timingSafeEquals(String a, String b) {
     final ab = utf8.encode(a);
     final bb = utf8.encode(b);
-    if (ab.length != bb.length) return false;
-    var diff = 0;
-    for (var i = 0; i < ab.length; i++) {
-      diff |= ab[i] ^ bb[i];
+    final maxLen = ab.length > bb.length ? ab.length : bb.length;
+    var diff = ab.length ^ bb.length;
+    for (var i = 0; i < maxLen; i++) {
+      final aB = i < ab.length ? ab[i] : 0;
+      final bB = i < bb.length ? bb[i] : 0;
+      diff |= aB ^ bB;
     }
     return diff == 0;
   }
@@ -250,7 +252,7 @@ class SettingsProvider extends ChangeNotifier {
 
   static String _generateSalt() {
     final rng = Random.secure();
-    final bytes = List<int>.generate(16, (_) => rng.nextInt(256));
+    final bytes = List<int>.generate(32, (_) => rng.nextInt(256));
     return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
   }
 
@@ -481,7 +483,9 @@ class SettingsProvider extends ChangeNotifier {
           'biometric': _biometric,
         }),
       );
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[SettingsProvider] _persist failed: $e');
+    }
   }
 
   Future<void> _queueWork(Future<void> Function() action) {

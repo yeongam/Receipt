@@ -26,6 +26,11 @@ class AuthProvider extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   bool get isAuthenticated => _status == AuthStatus.authenticated;
 
+  void clearError() {
+    _errorMessage = null;
+    _notifyIfActive();
+  }
+
   void _onAuthStateChange(AuthState state) async {
     final eventVersion = ++_authEventVersion;
     final authUser = state.session?.user;

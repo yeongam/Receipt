@@ -57,8 +57,15 @@ Future<void> main() async {
 
 class _AppScrollBehavior extends ScrollBehavior {
   @override
-  ScrollPhysics getScrollPhysics(BuildContext context) =>
-      const BouncingScrollPhysics();
+  ScrollPhysics getScrollPhysics(BuildContext context) {
+    switch (getPlatform(context)) {
+      case TargetPlatform.iOS:
+      case TargetPlatform.macOS:
+        return const BouncingScrollPhysics();
+      default:
+        return const ClampingScrollPhysics();
+    }
+  }
 }
 
 class MissingSupabaseConfigApp extends StatelessWidget {
@@ -181,7 +188,7 @@ class _RootGateState extends State<_RootGate> {
 
     if (authStatus == AuthStatus.authenticated && _stage != _Stage.main) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() => _stage = _Stage.main);
+        if (mounted && _stage != _Stage.main) setState(() => _stage = _Stage.main);
       });
     }
 
@@ -399,7 +406,7 @@ class _AppLockScreenState extends State<_AppLockScreen> {
               ),
               const SizedBox(height: 4),
             ],
-            if (_failedAttempts >= 1)
+            if (_failedAttempts >= 3)
               TextButton(
                 onPressed: _validating ? null : _showRecoveryDialog,
                 child: Text(
@@ -563,11 +570,21 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     final fixedExpenseProvider = context.read<FixedExpenseProvider>();
 
     await Future.wait<void>([
-      transactionProvider.loadMonth(userId, now).catchError((Object _) {}),
-      transactionProvider.loadMonthlyTrends(userId).catchError((Object _) {}),
-      categoryProvider.load(userId).catchError((Object _) {}),
-      fixedExpenseProvider.load(userId).catchError((Object _) {}),
-      context.read<NotificationRuleProvider>().load(userId).catchError((Object _) {}),
+      transactionProvider.loadMonth(userId, now).catchError((Object e) {
+        debugPrint('[MainNav] loadMonth failed: $e');
+      }),
+      transactionProvider.loadMonthlyTrends(userId).catchError((Object e) {
+        debugPrint('[MainNav] loadMonthlyTrends failed: $e');
+      }),
+      categoryProvider.load(userId).catchError((Object e) {
+        debugPrint('[MainNav] loadCategories failed: $e');
+      }),
+      fixedExpenseProvider.load(userId).catchError((Object e) {
+        debugPrint('[MainNav] loadFixedExpenses failed: $e');
+      }),
+      context.read<NotificationRuleProvider>().load(userId).catchError((Object e) {
+        debugPrint('[MainNav] loadNotificationRules failed: $e');
+      }),
     ]);
 
     if (!mounted) return;

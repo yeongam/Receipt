@@ -39,6 +39,7 @@ class FixedExpenseRepository {
         .from('fixed_expenses')
         .update(map)
         .eq('id', fe.id)
+        .eq('user_id', fe.userId)
         .select()
         .single();
     return FixedExpense.fromMap(data);

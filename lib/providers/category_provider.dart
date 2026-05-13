@@ -34,6 +34,12 @@ class CategoryProvider extends ChangeNotifier {
 
   Future<void> addCategory(AppCategory category) async {
     _ensureUserId(category.userId);
+    final isDuplicate = _categories.any(
+      (c) =>
+          c.name.toLowerCase() == category.name.toLowerCase() &&
+          c.type == category.type,
+    );
+    if (isDuplicate) throw StateError('같은 유형의 카테고리 이름이 이미 존재합니다.');
     final created = await _repo.insert(category);
     _categories.add(created);
     notifyListeners();
