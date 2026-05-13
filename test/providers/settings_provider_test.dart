@@ -58,7 +58,7 @@ void main() {
     provider.loadFromUser(
       AppUser(
         id: 'user-1',
-        email: 'user@example.com',
+        username: 'testuser',
         name: 'Tester',
         monthlyIncome: 3200000,
         currency: 'KRW',
@@ -270,7 +270,7 @@ AppUser _user({
 }) {
   return AppUser(
     id: 'user-1',
-    email: 'user@example.com',
+    username: 'testuser',
     name: '사용자',
     monthlyIncome: monthlyIncome,
     currency: currency,

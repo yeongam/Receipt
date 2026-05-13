@@ -16,20 +16,22 @@ class AuthRepository {
     return AppUser.fromMap(data);
   }
 
+  /// Converts a user-facing ID to the internal fake email used by Supabase auth.
+  static String _toFakeEmail(String username) => '$username@receipt.app';
+
   Future<AppUser> signUp({
-    required String email,
+    required String username,
     required String password,
-    required String name,
   }) async {
     final response = await _client.auth.signUp(
-      email: email,
+      email: _toFakeEmail(username),
       password: password,
-      data: {'name': name},
+      data: {'username': username},
     );
 
     final user = response.user;
     if (user == null) {
-      throw Exception('회원가입 실패: 사용자 정보를 받지 못했습니다.\n이메일 인증이 필요한 경우 메일함을 확인하세요.');
+      throw Exception('회원가입 실패: 사용자 정보를 받지 못했습니다.');
     }
 
     final userId = user.id;
@@ -45,11 +47,6 @@ class AuthRepository {
       // 이미 카테고리가 있거나 실패해도 계속 진행
     }
 
-    // update name in profile
-    try {
-      await _client.from('users').update({'name': name}).eq('id', userId);
-    } catch (_) {}
-
     final profile = await fetchProfile(userId);
     if (profile == null) {
       throw Exception('프로필 생성에 실패했습니다. SQL 마이그레이션이 실행됐는지 확인하세요.');
@@ -58,11 +55,11 @@ class AuthRepository {
   }
 
   Future<AppUser> signIn({
-    required String email,
+    required String username,
     required String password,
   }) async {
     final response = await _client.auth.signInWithPassword(
-      email: email,
+      email: _toFakeEmail(username),
       password: password,
     );
 

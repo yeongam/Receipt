@@ -15,7 +15,7 @@ import 'package:integrated_expense/screens/settings/settings_screens.dart';
 void main() {
   testWidgets('분류 관리 화면은 실제 카테고리를 보여주고 추가/삭제한다', (tester) async {
     final authProvider = AuthProvider(_FakeAuthRepository());
-    await authProvider.signIn(email: 'user@example.com', password: 'pw');
+    await authProvider.signIn(username: 'testuser', password: 'pw');
 
     final categoryProvider = CategoryProvider(_FakeCategoryRepository());
     await categoryProvider.addCategory(
@@ -63,7 +63,7 @@ void main() {
 
   testWidgets('분류 입력 중 목록이 갱신되어도 입력값을 유지한다', (tester) async {
     final authProvider = AuthProvider(_FakeAuthRepository());
-    await authProvider.signIn(email: 'user@example.com', password: 'pw');
+    await authProvider.signIn(username: 'testuser', password: 'pw');
 
     final categoryProvider = CategoryProvider(_FakeCategoryRepository());
 
@@ -109,12 +109,12 @@ class _FakeAuthRepository extends AuthRepository {
 
   @override
   Future<AppUser> signIn({
-    required String email,
+    required String username,
     required String password,
   }) async {
     return AppUser(
       id: 'user-1',
-      email: email,
+      username: username,
       name: 'Tester',
       monthlyIncome: 2500000,
       currency: 'KRW',

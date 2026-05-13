@@ -20,26 +20,26 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailCtrl = TextEditingController();
+  final _idCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   bool _keepLoggedIn = true;
   bool _isLoading = false;
 
   @override
   void dispose() {
-    _emailCtrl.dispose();
+    _idCtrl.dispose();
     _passwordCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
-    final email = _emailCtrl.text.trim();
+    final username = _idCtrl.text.trim();
     final password = _passwordCtrl.text;
-    if (email.isEmpty || password.isEmpty) return;
+    if (username.isEmpty || password.isEmpty) return;
 
     setState(() => _isLoading = true);
     final ok = await context.read<AuthProvider>().signIn(
-          email: email,
+          username: username,
           password: password,
         );
     if (!mounted) return;
@@ -96,12 +96,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('이메일', style: AppTextStyles.labelMedium),
+                      const Text('아이디', style: AppTextStyles.labelMedium),
                       const SizedBox(height: 8),
                       _AuthTextField(
-                        controller: _emailCtrl,
-                        hintText: '이메일을 입력하세요',
-                        keyboardType: TextInputType.emailAddress,
+                        controller: _idCtrl,
+                        hintText: '아이디를 입력하세요',
                       ),
                       const SizedBox(height: 18),
                       const Text('비밀번호', style: AppTextStyles.labelMedium),
@@ -190,13 +189,11 @@ class _AuthTextField extends StatelessWidget {
   final TextEditingController controller;
   final String hintText;
   final bool obscureText;
-  final TextInputType keyboardType;
 
   const _AuthTextField({
     required this.controller,
     required this.hintText,
     this.obscureText = false,
-    this.keyboardType = TextInputType.text,
   });
 
   @override
@@ -204,7 +201,6 @@ class _AuthTextField extends StatelessWidget {
     return TextField(
       controller: controller,
       obscureText: obscureText,
-      keyboardType: keyboardType,
       decoration: InputDecoration(
         hintText: hintText,
         hintStyle: AppTextStyles.bodySmall.copyWith(color: AppColors.textHint),

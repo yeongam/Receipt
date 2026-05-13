@@ -30,7 +30,7 @@ class MyPageScreen extends StatelessWidget {
             .clamp(0, 100)
             .toDouble();
     final userName = authProvider.user?.name ?? '';
-    final userEmail = authProvider.user?.email ?? '';
+    final userUsername = authProvider.user?.username ?? '';
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -55,7 +55,7 @@ class MyPageScreen extends StatelessWidget {
       ),
       body: ListView(
         children: [
-          _ProfileHeader(name: userName, profileId: userEmail),
+          _ProfileHeader(name: userName, profileId: userUsername),
           const SizedBox(height: 16),
           _StatsRow(
             totalTransactions: transactions.length,

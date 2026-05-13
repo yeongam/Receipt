@@ -20,8 +20,7 @@ class SignupScreen extends StatefulWidget {
 }
 
 class _SignupScreenState extends State<SignupScreen> {
-  final _nameCtrl = TextEditingController();
-  final _emailCtrl = TextEditingController();
+  final _idCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
   bool _agreeAge = false;
@@ -30,20 +29,18 @@ class _SignupScreenState extends State<SignupScreen> {
 
   @override
   void dispose() {
-    _nameCtrl.dispose();
-    _emailCtrl.dispose();
+    _idCtrl.dispose();
     _passwordCtrl.dispose();
     _confirmCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
-    final name = _nameCtrl.text.trim();
-    final email = _emailCtrl.text.trim();
+    final username = _idCtrl.text.trim();
     final password = _passwordCtrl.text;
     final confirm = _confirmCtrl.text;
 
-    if (name.isEmpty || email.isEmpty || password.isEmpty) {
+    if (username.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('모든 항목을 입력해주세요')));
       return;
@@ -61,9 +58,8 @@ class _SignupScreenState extends State<SignupScreen> {
 
     setState(() => _isLoading = true);
     final ok = await context.read<AuthProvider>().signUp(
-          email: email,
+          username: username,
           password: password,
-          name: name,
         );
     if (!mounted) return;
     setState(() => _isLoading = false);
@@ -119,19 +115,11 @@ class _SignupScreenState extends State<SignupScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('이름', style: AppTextStyles.labelMedium),
+                      const Text('아이디', style: AppTextStyles.labelMedium),
                       const SizedBox(height: 8),
                       _SignupTextField(
-                        controller: _nameCtrl,
-                        hintText: '이름을 입력하세요',
-                      ),
-                      const SizedBox(height: 14),
-                      const Text('이메일', style: AppTextStyles.labelMedium),
-                      const SizedBox(height: 8),
-                      _SignupTextField(
-                        controller: _emailCtrl,
-                        hintText: '이메일을 입력하세요',
-                        keyboardType: TextInputType.emailAddress,
+                        controller: _idCtrl,
+                        hintText: '아이디를 입력하세요',
                       ),
                       const SizedBox(height: 14),
                       const Text('비밀번호', style: AppTextStyles.labelMedium),
@@ -230,13 +218,11 @@ class _SignupTextField extends StatelessWidget {
   final TextEditingController controller;
   final String hintText;
   final bool obscureText;
-  final TextInputType keyboardType;
 
   const _SignupTextField({
     required this.controller,
     required this.hintText,
     this.obscureText = false,
-    this.keyboardType = TextInputType.text,
   });
 
   @override
@@ -244,7 +230,6 @@ class _SignupTextField extends StatelessWidget {
     return TextField(
       controller: controller,
       obscureText: obscureText,
-      keyboardType: keyboardType,
       decoration: InputDecoration(
         hintText: hintText,
         hintStyle: AppTextStyles.bodySmall.copyWith(color: AppColors.textHint),

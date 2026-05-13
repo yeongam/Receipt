@@ -58,14 +58,13 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<bool> signUp({
-    required String email,
+    required String username,
     required String password,
-    required String name,
   }) async {
     _errorMessage = null;
     try {
       final user =
-          await _repo.signUp(email: email, password: password, name: name);
+          await _repo.signUp(username: username, password: password);
       if (_isDisposed) return true;
       _user = user;
       _status = AuthStatus.authenticated;
@@ -79,10 +78,10 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> signIn({required String email, required String password}) async {
+  Future<bool> signIn({required String username, required String password}) async {
     _errorMessage = null;
     try {
-      final user = await _repo.signIn(email: email, password: password);
+      final user = await _repo.signIn(username: username, password: password);
       if (_isDisposed) return true;
       _user = user;
       _status = AuthStatus.authenticated;

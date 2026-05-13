@@ -3,7 +3,7 @@ const _notSet = Object();
 
 class AppUser {
   final String id;
-  final String email;
+  final String username;
   final String name;
   final int monthlyIncome;
   final String currency;
@@ -25,7 +25,7 @@ class AppUser {
 
   const AppUser({
     required this.id,
-    required this.email,
+    required this.username,
     required this.name,
     required this.monthlyIncome,
     required this.currency,
@@ -50,8 +50,8 @@ class AppUser {
     return AppUser(
       id: map['id'] as String? ??
           (throw const FormatException('AppUser.fromMap: missing id')),
-      email: map['email'] as String? ??
-          (throw const FormatException('AppUser.fromMap: missing email')),
+      username: map['username'] as String? ??
+          (throw const FormatException('AppUser.fromMap: missing username')),
       name: map['name'] as String? ?? '',
       monthlyIncome: (map['monthly_income'] as num?)?.toInt() ?? 0,
       currency: map['currency'] as String? ?? 'KRW',
@@ -131,7 +131,7 @@ class AppUser {
   }) {
     return AppUser(
       id: id,
-      email: email,
+      username: username,
       name: name ?? this.name,
       monthlyIncome: monthlyIncome ?? this.monthlyIncome,
       currency: currency ?? this.currency,

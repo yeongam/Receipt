@@ -14,7 +14,7 @@ import 'package:integrated_expense/screens/notification/notification_screen.dart
 void main() {
   testWidgets('고정지출 추가 버튼으로 항목을 등록할 수 있다', (tester) async {
     final authProvider = AuthProvider(_FakeAuthRepository());
-    await authProvider.signIn(email: 'user@example.com', password: 'pw');
+    await authProvider.signIn(username: 'testuser', password: 'pw');
     final fixedExpenseProvider =
         FixedExpenseProvider(_FakeFixedExpenseRepository());
 
@@ -63,12 +63,12 @@ class _FakeAuthRepository extends AuthRepository {
 
   @override
   Future<AppUser> signIn({
-    required String email,
+    required String username,
     required String password,
   }) async {
     return AppUser(
       id: 'user-1',
-      email: email,
+      username: username,
       name: 'Tester',
       monthlyIncome: 2500000,
       currency: 'KRW',

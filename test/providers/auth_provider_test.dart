@@ -41,7 +41,7 @@ void main() {
     final provider = AuthProvider(repository);
 
     final signIn = provider.signIn(
-      email: 'user@example.com',
+      username: 'user',
       password: 'password',
     );
     provider.dispose();
@@ -83,7 +83,7 @@ class _FakeAuthRepository extends AuthRepository {
 
   @override
   Future<AppUser> signIn({
-    required String email,
+    required String username,
     required String password,
   }) {
     _signIn = Completer<AppUser>();
@@ -109,7 +109,7 @@ Session _session(String userId) {
 AppUser _user(String id) {
   return AppUser(
     id: id,
-    email: '$id@example.com',
+    username: id,
     name: 'Tester',
     monthlyIncome: 0,
     currency: 'KRW',

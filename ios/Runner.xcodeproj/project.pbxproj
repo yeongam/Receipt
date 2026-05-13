@@ -303,7 +303,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "export PATH=\"/Users/user/.codex/orico-bin:$PATH\"\nexport COPYFILE_DISABLE=1\nexport COPY_EXTENDED_ATTRIBUTES_DISABLE=1\nfind \"$SRCROOT/..\" -name '._*' -delete 2>/dev/null || true\n\"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks.sh\"\nfind \"$SRCROOT/..\" -name '._*' -delete 2>/dev/null || true\n";
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 		926CBE4278525021D4026BC2 /* [CP] Check Pods Manifest.lock */ = {
