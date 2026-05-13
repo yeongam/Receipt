@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../providers/auth_provider.dart';
+import 'account_recovery_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final VoidCallback onLogin;
@@ -126,9 +127,13 @@ class _LoginScreenState extends State<LoginScreen> {
                           const Text('자동 로그인', style: AppTextStyles.bodySmall),
                           const Spacer(),
                           TextButton(
-                            onPressed: () {},
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => const AccountRecoveryScreen(),
+                              ),
+                            ),
                             child: Text(
-                              '아이디/비밀번호 찾기',
+                              '비밀번호 재설정',
                               style: AppTextStyles.caption
                                   .copyWith(color: AppColors.textSecondary),
                             ),
