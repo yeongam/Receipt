@@ -43,8 +43,7 @@ class _RecoveryFormState extends State<_RecoveryForm> {
   bool _obscureConfirm = true;
 
   bool _isLoading = false;
-  bool _codeVerified = false;
-  String? _resetToken;
+  bool _codeEntered = false;
   String? _errorText;
 
   static const int _maxAttempts = 5;
@@ -59,56 +58,18 @@ class _RecoveryFormState extends State<_RecoveryForm> {
     super.dispose();
   }
 
-  Future<void> _verifyCode() async {
-    if (_attempts >= _maxAttempts) return;
-    final username = _idCtrl.text.trim();
-    final code = _codeCtrl.text.trim();
-    if (username.isEmpty || code.isEmpty) return;
-
+  /// Phase 1: just validate fields are non-empty, then show Phase 2.
+  void _proceedToNewPassword() {
+    if (_idCtrl.text.trim().isEmpty || _codeCtrl.text.trim().isEmpty) return;
     setState(() {
-      _isLoading = true;
+      _codeEntered = true;
       _errorText = null;
     });
-
-    try {
-      final result = await Supabase.instance.client
-          .rpc('issue_password_reset_token', params: {
-        'p_username': username,
-        'p_recovery_code': code,
-      }) as String?;
-
-      if (!mounted) return;
-
-      if (result == null) {
-        _attempts++;
-        setState(() {
-          _errorText = _attempts >= _maxAttempts
-              ? context.tr('시도 횟수를 초과했습니다.', 'Too many attempts.')
-              : context.tr(
-                  '아이디 또는 복구 코드가 올바르지 않습니다.', 'Invalid ID or recovery code.');
-        });
-      } else if (result == 'NEEDS_EDGE_FUNCTION') {
-        setState(() {
-          _errorText = context.tr(
-            '이 계정의 복구는 관리자에게 문의하세요.',
-            'Please contact support to recover this account.',
-          );
-        });
-      } else {
-        setState(() {
-          _resetToken = result;
-          _codeVerified = true;
-        });
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _errorText = e.toString());
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
   }
 
+  /// Phase 2: call Edge Function with username + recovery code + new password.
   Future<void> _resetPassword() async {
+    if (_attempts >= _maxAttempts) return;
     final password = _pwCtrl.text;
     final confirm = _confirmCtrl.text;
 
@@ -118,7 +79,6 @@ class _RecoveryFormState extends State<_RecoveryForm> {
           context.tr('비밀번호가 일치하지 않습니다.', 'Passwords do not match.'));
       return;
     }
-    if (_resetToken == null) return;
 
     setState(() {
       _isLoading = true;
@@ -126,15 +86,37 @@ class _RecoveryFormState extends State<_RecoveryForm> {
     });
 
     try {
-      // Consume the reset token to get the user_id.
-      // Actual Supabase auth password update requires the service role key
-      // (Edge Function). This placeholder confirms the token is valid.
-      await Supabase.instance.client
-          .rpc('consume_reset_token', params: {'p_token': _resetToken});
+      final response = await Supabase.instance.client.functions.invoke(
+        'reset-password-with-recovery-code',
+        body: {
+          'username': _idCtrl.text.trim(),
+          'recoveryCode': _codeCtrl.text.trim(),
+          'newPassword': password,
+        },
+      );
 
       if (!mounted) return;
-      // TODO: call Edge Function with (user_id, newPassword) to update auth.
-      _showSuccess();
+
+      final data = response.data as Map<String, dynamic>?;
+      if (data?['success'] == true) {
+        _showSuccess();
+      } else {
+        _attempts++;
+        final err = data?['error'] as String? ?? 'unknown';
+        setState(() {
+          _errorText = switch (err) {
+            'invalid_credentials' => _attempts >= _maxAttempts
+                ? context.tr('시도 횟수를 초과했습니다.', 'Too many attempts.')
+                : context.tr(
+                    '아이디 또는 복구 코드가 올바르지 않습니다.',
+                    'Invalid ID or recovery code.',
+                  ),
+            'password_too_short' =>
+              context.tr('비밀번호는 6자 이상이어야 합니다.', 'Password must be at least 6 characters.'),
+            _ => context.tr('오류가 발생했습니다.', 'An error occurred.'),
+          };
+        });
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _errorText = e.toString());
@@ -171,9 +153,9 @@ class _RecoveryFormState extends State<_RecoveryForm> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
       children: [
-        _Header(verified: _codeVerified),
+        _Header(verified: _codeEntered),
         const SizedBox(height: 24),
-        if (!_codeVerified) _phase1() else _phase2(),
+        if (!_codeEntered) _phase1() else _phase2(),
       ],
     );
   }
@@ -215,15 +197,8 @@ class _RecoveryFormState extends State<_RecoveryForm> {
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: exhausted || _isLoading ? null : _verifyCode,
-            child: _isLoading
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white),
-                  )
-                : Text(context.tr('확인', 'Verify')),
+            onPressed: exhausted ? null : _proceedToNewPassword,
+            child: Text(context.tr('다음', 'Next')),
           ),
         ),
       ],
