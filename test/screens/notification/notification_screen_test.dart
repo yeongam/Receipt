@@ -5,10 +5,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:integrated_expense/data/models/app_user.dart';
 import 'package:integrated_expense/data/models/fixed_expense.dart';
+import 'package:integrated_expense/data/models/notification_rule.dart';
 import 'package:integrated_expense/data/repositories/auth_repository.dart';
 import 'package:integrated_expense/data/repositories/fixed_expense_repository.dart';
+import 'package:integrated_expense/data/repositories/notification_repository.dart';
 import 'package:integrated_expense/providers/auth_provider.dart';
 import 'package:integrated_expense/providers/fixed_expense_provider.dart';
+import 'package:integrated_expense/providers/notification_rule_provider.dart';
 import 'package:integrated_expense/screens/notification/notification_screen.dart';
 
 void main() {
@@ -17,6 +20,8 @@ void main() {
     await authProvider.signIn(username: 'testuser', password: 'pw');
     final fixedExpenseProvider =
         FixedExpenseProvider(_FakeFixedExpenseRepository());
+    final ruleProvider =
+        NotificationRuleProvider(_FakeNotificationRepository());
 
     await tester.pumpWidget(
       MultiProvider(
@@ -24,6 +29,9 @@ void main() {
           ChangeNotifierProvider<AuthProvider>.value(value: authProvider),
           ChangeNotifierProvider<FixedExpenseProvider>.value(
             value: fixedExpenseProvider,
+          ),
+          ChangeNotifierProvider<NotificationRuleProvider>.value(
+            value: ruleProvider,
           ),
         ],
         child: const MaterialApp(
@@ -77,6 +85,14 @@ class _FakeAuthRepository extends AuthRepository {
       updatedAt: DateTime(2026, 4, 29),
     );
   }
+}
+
+class _FakeNotificationRepository extends NotificationRepository {
+  @override
+  Future<List<NotificationRule>> fetchRules(String userId) async => [];
+
+  @override
+  Future<NotificationRule> insertRule(NotificationRule rule) async => rule;
 }
 
 class _FakeFixedExpenseRepository extends FixedExpenseRepository {

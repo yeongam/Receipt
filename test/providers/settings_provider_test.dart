@@ -220,6 +220,13 @@ class _FakeAuthRepository extends AuthRepository {
     this.user = user;
     return user;
   }
+
+  @override
+  Future<AppUser> updateProfileFields(AppUser user) async {
+    lastUpdatedUser = user;
+    this.user = user;
+    return user;
+  }
 }
 
 class _FakeBudgetRepository extends BudgetRepository {
