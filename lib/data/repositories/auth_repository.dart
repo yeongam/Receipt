@@ -16,7 +16,6 @@ class AuthRepository {
     return AppUser.fromMap(data);
   }
 
-  /// Converts a user-facing ID to the internal fake email used by Supabase auth.
   static String _toFakeEmail(String username) => '$username@receipt.app';
 
   Future<AppUser> signUp({
@@ -36,16 +35,12 @@ class AuthRepository {
 
     final userId = user.id;
 
-    // trigger가 users 프로필을 생성할 시간을 주기 위해 잠시 대기
     await Future.delayed(const Duration(milliseconds: 500));
 
-    // seed default categories
     try {
       await _client
           .rpc('seed_default_categories', params: {'p_user_id': userId});
-    } catch (_) {
-      // 이미 카테고리가 있거나 실패해도 계속 진행
-    }
+    } catch (_) {}
 
     final profile = await fetchProfile(userId);
     if (profile == null) {
@@ -79,8 +74,6 @@ class AuthRepository {
     await _client.auth.signOut();
   }
 
-  /// Full update — includes app_lock security fields.
-  /// Use only for setAppLockPasscode / disableAppLock paths.
   Future<AppUser> updateProfile(AppUser user) async {
     await _client.from('users').update(user.toUpdateMap()).eq('id', user.id);
     final profile = await fetchProfile(user.id);
@@ -88,9 +81,6 @@ class AuthRepository {
     return profile;
   }
 
-  /// Profile-only update — excludes app_lock security fields.
-  /// Use for all routine settings changes to avoid accidentally overwriting
-  /// the PIN hash or recovery code stored in Supabase.
   Future<AppUser> updateProfileFields(AppUser user) async {
     await _client
         .from('users')

@@ -1,4 +1,3 @@
-// Sentinel for "not provided" in copyWith — allows explicitly passing null.
 const _notSet = Object();
 
 class AppUser {
@@ -79,8 +78,6 @@ class AppUser {
     );
   }
 
-  /// Full update map including security fields.
-  /// Use only when explicitly writing app-lock data (setAppLockPasscode, disableAppLock).
   Map<String, dynamic> toUpdateMap() {
     return {
       ...toProfileUpdateMap(),
@@ -89,8 +86,6 @@ class AppUser {
     };
   }
 
-  /// Profile-only update map — excludes app_lock security fields.
-  /// Use for all routine settings saves to avoid clobbering security data.
   Map<String, dynamic> toProfileUpdateMap() {
     return {
       'name': name,
@@ -125,7 +120,6 @@ class AppUser {
     int? budgetWarningSecondary,
     String? budgetStartDay,
     bool? isProfileCompleted,
-    // Use sentinel so callers can pass null to explicitly clear these fields.
     Object? appLockPasscodeHash = _notSet,
     Object? appLockRecoveryCode = _notSet,
   }) {

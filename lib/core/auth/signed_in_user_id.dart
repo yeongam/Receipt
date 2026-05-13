@@ -21,16 +21,12 @@ String? resolveSignedInUserId(BuildContext context) {
   String? authProviderUserId;
   try {
     authProviderUserId = context.read<AuthProvider?>()?.user?.id;
-  } catch (_) {
-    // Isolated widget tests may not provide AuthProvider.
-  }
+  } catch (_) {}
 
   String? supabaseUserId;
   try {
     supabaseUserId = SupabaseConfig.client.auth.currentUser?.id;
-  } catch (_) {
-    // Supabase may not be initialized in tests or before bootstrap completes.
-  }
+  } catch (_) {}
 
   return firstSignedInUserId(
     authProviderUserId: authProviderUserId,

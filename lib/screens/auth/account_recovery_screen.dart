@@ -20,9 +20,6 @@ class AccountRecoveryScreen extends StatelessWidget {
   }
 }
 
-/// Two-phase form:
-/// Phase 1 — verify identity (username + recovery code).
-/// Phase 2 — set new password (shown after verification succeeds).
 class _RecoveryForm extends StatefulWidget {
   const _RecoveryForm();
 
@@ -31,12 +28,10 @@ class _RecoveryForm extends StatefulWidget {
 }
 
 class _RecoveryFormState extends State<_RecoveryForm> {
-  // Phase 1
   final _idCtrl = TextEditingController();
   final _codeCtrl = TextEditingController();
   bool _obscureCode = true;
 
-  // Phase 2
   final _pwCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
   bool _obscurePw = true;
@@ -58,7 +53,6 @@ class _RecoveryFormState extends State<_RecoveryForm> {
     super.dispose();
   }
 
-  /// Phase 1: just validate fields are non-empty, then show Phase 2.
   void _proceedToNewPassword() {
     if (_idCtrl.text.trim().isEmpty || _codeCtrl.text.trim().isEmpty) return;
     setState(() {
@@ -67,7 +61,6 @@ class _RecoveryFormState extends State<_RecoveryForm> {
     });
   }
 
-  /// Phase 2: call Edge Function with username + recovery code + new password.
   Future<void> _resetPassword() async {
     if (_attempts >= _maxAttempts) return;
     final password = _pwCtrl.text;

@@ -143,7 +143,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                         updatedAt: fe.updatedAt,
                                       ),
                                     );
-                                    // Mirror the active state to the notification rule.
                                     await ruleProvider.setEnabled(fe.id, value);
                                   },
                                 ),

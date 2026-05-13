@@ -93,7 +93,6 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  // Repositories are created once — not on every build.
   final _authRepository = AuthRepository();
   final _categoryRepository = CategoryRepository();
   final _fixedExpenseRepository = FixedExpenseRepository();
@@ -174,14 +173,12 @@ class _RootGateState extends State<_RootGate> {
   Widget build(BuildContext context) {
     final authStatus = context.watch<AuthProvider>().status;
 
-    // Already authenticated: skip intro/login
     if (authStatus == AuthStatus.authenticated && _stage != _Stage.main) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() => _stage = _Stage.main);
       });
     }
 
-    // Logged out: clear providers and go back to login
     if (authStatus == AuthStatus.unauthenticated && _stage == _Stage.main) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -242,7 +239,6 @@ class _AppLockScreenState extends State<_AppLockScreen> {
   @override
   void initState() {
     super.initState();
-    // Restore persisted attempt count so a process kill doesn't reset the counter (H-3).
     _storage.read(key: _attemptsKey).then((stored) {
       if (stored != null && mounted) {
         setState(() => _failedAttempts = int.tryParse(stored) ?? 0);
@@ -260,7 +256,7 @@ class _AppLockScreenState extends State<_AppLockScreen> {
       final auth = LocalAuthentication();
       final canCheck = await auth.canCheckBiometrics;
       if (!canCheck || !mounted) {
-        _biometricTriggered = false; // allow manual retry
+        _biometricTriggered = false;
         return;
       }
       final authenticated = await auth.authenticate(
@@ -271,10 +267,10 @@ class _AppLockScreenState extends State<_AppLockScreen> {
         await _storage.delete(key: _attemptsKey);
         if (mounted) widget.onUnlocked();
       } else {
-        _biometricTriggered = false; // cancelled → allow retry via button
+        _biometricTriggered = false;
       }
     } catch (_) {
-      _biometricTriggered = false; // error → allow retry via button
+      _biometricTriggered = false;
     }
   }
 
@@ -294,7 +290,6 @@ class _AppLockScreenState extends State<_AppLockScreen> {
 
   Future<void> _submit() async {
     if (_validating) return;
-    // Capture and immediately zero the PIN from UI state before async work.
     final pin = _pin;
     setState(() {
       _validating = true;
@@ -392,7 +387,6 @@ class _AppLockScreenState extends State<_AppLockScreen> {
               ),
               const SizedBox(height: 4),
             ],
-            // Recovery dialog shown only after at least one failed attempt.
             if (_failedAttempts >= 1)
               TextButton(
                 onPressed: _validating ? null : _showRecoveryDialog,
@@ -536,7 +530,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         _isDataReady = true;
         _isLocked = isLocked;
       });
-      // Notification permission popup must not appear before the lock gate.
       if (!isLocked) _initNotificationService();
     });
   }
@@ -547,16 +540,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     final authProvider = context.read<AuthProvider>();
     final settingsProvider = context.read<SettingsProvider>();
 
-    // Load settings FIRST — must complete before the lock check in initState.
-    // Financial-data failures must not skip this step.
     final authUser = authProvider.user;
     if (authUser != null) {
       await settingsProvider.load(user: authUser);
     }
     if (!mounted) return;
 
-    // Financial data: absorb individual failures so a single network error
-    // cannot leave settings unloaded and the lock gate open.
     final transactionProvider = context.read<TransactionProvider>();
     final categoryProvider = context.read<CategoryProvider>();
     final fixedExpenseProvider = context.read<FixedExpenseProvider>();
@@ -571,8 +560,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
     if (!mounted) return;
 
-    // Initialize the notification plugin (no OS popup — permission is
-    // requested later, after the lock gate is resolved).
     await NotificationService.instance.initialize();
 
     if (!mounted) return;
@@ -583,9 +570,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     });
   }
 
-  /// Requests notification permission and syncs schedules.
-  /// Called only after the app lock gate is resolved to avoid showing
-  /// an OS permission popup before the lock screen.
   Future<void> _initNotificationService() async {
     if (!mounted) return;
     final settingsProvider = context.read<SettingsProvider>();
@@ -645,8 +629,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLocked) {
-      // Use Consumer so that the lock-screen callbacks always reference the
-      // latest SettingsProvider instance (e.g. if _user reloads mid-session).
       return Consumer<SettingsProvider>(
         builder: (context, settings, _) => _AppLockScreen(
           validatePin: settings.validateAppLockPasscode,
@@ -660,7 +642,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         ),
       );
     }
-    // While loading, show blank screen to prevent data exposure before lock check
     if (!_isDataReady) {
       final theme = Theme.of(context);
       return Scaffold(backgroundColor: theme.scaffoldBackgroundColor);

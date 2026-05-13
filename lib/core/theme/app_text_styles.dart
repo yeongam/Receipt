@@ -39,7 +39,6 @@ class AppTextStyles {
     height: 1.4,
   );
 
-  // ─── Title ──────────────────────────────────────────────────────
   static const TextStyle titleLarge = TextStyle(
     fontSize: 18,
     fontWeight: FontWeight.w600,
@@ -61,7 +60,6 @@ class AppTextStyles {
     height: 1.5,
   );
 
-  // ─── Body ───────────────────────────────────────────────────────
   static const TextStyle bodyLarge = TextStyle(
     fontSize: 18,
     fontWeight: FontWeight.w400,
@@ -83,7 +81,6 @@ class AppTextStyles {
     height: 1.6,
   );
 
-  // ─── Label ──────────────────────────────────────────────────────
   static const TextStyle labelLarge = TextStyle(
     fontSize: 16,
     fontWeight: FontWeight.w500,
@@ -105,7 +102,6 @@ class AppTextStyles {
     height: 1.4,
   );
 
-  // ─── Special ────────────────────────────────────────────────────
   static const TextStyle amount = TextStyle(
     fontSize: 31,
     fontWeight: FontWeight.w700,
@@ -178,7 +174,6 @@ class AppTextStyles {
     height: 1.45,
   );
 
-  // ─── Flutter TextTheme ───────────────────────────────────────────
   static const TextTheme textTheme = TextTheme(
     displayLarge: displayLarge,
     displayMedium: displayMedium,

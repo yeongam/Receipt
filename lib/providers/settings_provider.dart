@@ -13,8 +13,6 @@ import '../data/repositories/auth_repository.dart';
 import '../data/repositories/budget_repository.dart';
 import '../data/repositories/notification_repository.dart';
 
-/// Top-level function for running PBKDF2 in a compute isolate.
-/// Must be top-level (not a closure) to be isolate-sendable.
 String _doPbkdf2(List<String> args) =>
     SettingsProvider._pbkdf2(args[0], args[1]);
 
@@ -70,7 +68,7 @@ class SettingsProvider extends ChangeNotifier {
 
   Future<void> _pendingWork = Future.value();
   AppUser? _user;
-  String? _pendingRecoveryCode;  // read-once recovery code
+  String? _pendingRecoveryCode;
   NotificationSetting? _notificationSetting;
   bool _isLoaded = false;
 
@@ -113,7 +111,6 @@ class SettingsProvider extends ChangeNotifier {
   bool get showWeeklySummary => _showWeeklySummary;
   String get themeLabel => _themeLabel;
 
-  /// Returns 'dark' or 'light'. Handles legacy Korean values.
   String get themeToken => (_themeLabel == '다크' || _themeLabel == 'dark') ? 'dark' : 'light';
 
   String get startScreen => _startScreen;
@@ -122,19 +119,14 @@ class SettingsProvider extends ChangeNotifier {
   bool get biometric => _biometric;
   NotificationSetting? get notificationSetting => _notificationSetting;
 
-  /// Whether app lock passcode is configured.
   bool get hasAppLock => _user?.appLockPasscodeHash?.isNotEmpty == true;
 
-  /// Returns the recovery code produced by the last successful [setAppLockPasscode].
-  /// One-time read: returns null on subsequent calls. Never call from build().
   String? consumeRecoveryCode() {
     final code = _pendingRecoveryCode;
     _pendingRecoveryCode = null;
     return code;
   }
 
-  /// Validates [passcode] against the stored hash.
-  /// Runs PBKDF2 on a compute isolate to avoid blocking the UI thread.
   Future<bool> validateAppLockPasscode(String passcode) async {
     final stored = _user?.appLockPasscodeHash;
     if (stored == null || stored.isEmpty) return false;
@@ -145,13 +137,11 @@ class SettingsProvider extends ChangeNotifier {
       return derived == parts[2];
     }
     if (stored.contains(':')) {
-      // Legacy salted SHA-256: salt:sha256(salt + passcode)
       final idx = stored.indexOf(':');
       final salt = stored.substring(0, idx);
       final hash = stored.substring(idx + 1);
       return _sha256(salt + passcode) == hash;
     }
-    // Legacy plain SHA-256
     return _sha256(passcode) == stored;
   }
 
@@ -164,7 +154,6 @@ class SettingsProvider extends ChangeNotifier {
       final derived = await compute(_doPbkdf2, [code, parts[1]]);
       return derived == parts[2];
     }
-    // Legacy plain SHA-256
     return _sha256(code) == stored;
   }
 
@@ -195,8 +184,6 @@ class SettingsProvider extends ChangeNotifier {
       final user = _user;
       final authRepository = _authRepository;
       if (user == null || authRepository == null) return;
-      // Run both PBKDF2 hashes on compute isolates — must complete before save.
-      // Recovery code uses PBKDF2+salt (pbkdf2rc: prefix) to match PIN security.
       final pinHash = await compute(_doPbkdf2, [passcode, pinSalt]);
       final recoveryHash = await compute(_doPbkdf2, [recovery, recoverySalt]);
       _user = await authRepository.updateProfile(
@@ -205,7 +192,6 @@ class SettingsProvider extends ChangeNotifier {
           appLockRecoveryCode: 'pbkdf2rc:$recoverySalt:$recoveryHash',
         ),
       );
-      // Expose recovery code ONLY after the Supabase write succeeds.
       _pendingRecoveryCode = recovery;
       notifyListeners();
     });
@@ -216,10 +202,6 @@ class SettingsProvider extends ChangeNotifier {
     return sha256.convert(bytes).toString();
   }
 
-  /// PBKDF2-HMAC-SHA256 with [_pbkdf2Iterations] rounds.
-  /// Output: lowercase hex of the 32-byte derived key.
-  /// Derives exactly one 32-byte block (SHA-256 output size).
-  /// MUST be updated if the hash function ever changes.
   static const int _pbkdf2Iterations = 50000;
 
   static String _pbkdf2(String password, String saltHex) {
@@ -231,10 +213,9 @@ class SettingsProvider extends ChangeNotifier {
 
     final hmac = Hmac(sha256, keyBytes);
 
-    // U1 = HMAC(password, salt || 0x00000001)
     final blockInput = Uint8List(saltBytes.length + 4);
     blockInput.setRange(0, saltBytes.length, saltBytes);
-    blockInput[saltBytes.length + 3] = 1; // big-endian block index = 1
+    blockInput[saltBytes.length + 3] = 1;
 
     var u = Uint8List.fromList(hmac.convert(blockInput).bytes);
     final dk = Uint8List.fromList(u);
@@ -358,7 +339,6 @@ class SettingsProvider extends ChangeNotifier {
     bool? fixedExpenseAlert,
     bool? reminderAlert,
   }) async {
-    // Snapshot previous values for rollback on failure.
     final prevBudgetAlert = _budgetAlert;
     final prevFixedExpenseAlert = _fixedExpenseAlert;
     final prevReminderAlert = _reminderAlert;
@@ -490,9 +470,7 @@ class SettingsProvider extends ChangeNotifier {
           'biometric': _biometric,
         }),
       );
-    } catch (_) {
-      // The UI remains usable even if persistence fails.
-    }
+    } catch (_) {}
   }
 
   Future<void> _queueWork(Future<void> Function() action) {
@@ -558,8 +536,6 @@ class SettingsProvider extends ChangeNotifier {
     final authRepository = _authRepository;
     if (user == null || authRepository == null) return;
 
-    // Use updateProfileFields (not updateProfile) to avoid writing security
-    // fields on every routine settings change (H-2).
     _user = await authRepository.updateProfileFields(
       user.copyWith(
         currency: _currency,

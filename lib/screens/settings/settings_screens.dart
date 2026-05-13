@@ -82,9 +82,6 @@ class CategorySettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider?>();
     final categoryProvider = context.watch<CategoryProvider>();
-    // Use auth provider as canonical source; fall back to secure storage only.
-    // Avoided reading from categories to prevent cross-user contamination if
-    // categories were not cleared after sign-out.
     final userId = authProvider?.user?.id ?? resolveSignedInUserId(context) ?? '';
 
     return SettingsScaffold(
@@ -345,8 +342,6 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
       if (context.read<SettingsProvider>().hasAppLock) {
         await _saveSecurity(lockOnLaunch: true);
       } else {
-        // When no PIN exists, _PinSetupDialog calls updateSecurity(lockOnLaunch: true)
-        // internally on success. If _PinSetupDialog is ever changed, keep this in sync.
         await _showPinSetup();
       }
     } else {
@@ -724,7 +719,6 @@ class _PinSetupDialogState extends State<_PinSetupDialog> {
       });
       return;
     }
-    // Capture PIN and zero both fields before any async work.
     final pinToSave = _pin;
     setState(() {
       _saving = true;
@@ -789,10 +783,6 @@ class _PinSetupDialogState extends State<_PinSetupDialog> {
   }
 }
 
-/// Recovery code display dialog.
-/// Shows the code in a non-selectable Text widget (not accessible to
-/// screen readers or screenshot tools the way SelectableText would be).
-/// Zeroes the displayed string from the widget tree before popping (C-2).
 class _RecoveryCodeDisplayDialog extends StatefulWidget {
   final String code;
   const _RecoveryCodeDisplayDialog({required this.code});
@@ -837,7 +827,6 @@ class _RecoveryCodeDisplayDialogState
       actions: [
         ElevatedButton(
           onPressed: () {
-            // Zero the code from the widget tree before closing the dialog.
             setState(() => _displayCode = '');
             Navigator.of(context).pop();
           },

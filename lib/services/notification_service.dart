@@ -14,7 +14,6 @@ class NotificationService {
   static final NotificationService instance = NotificationService._();
 
   static const int _dailyReminderId = 100;
-  // Fixed-expense alert IDs start at 1000 and are capped at 1499 (500 slots).
   static const int _fixedExpenseIdStart = 1000;
   static const int _fixedExpenseIdMax = 1500;
   static const String _channelId = 'integrated_expense_alerts';
@@ -24,8 +23,6 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
 
-  // Cache the initialisation future so concurrent callers share one result
-  // and the plugin is never initialised twice (H-1).
   Future<void>? _initFuture;
 
   Future<void> initialize() => _initFuture ??= _doInitialize();
@@ -72,12 +69,8 @@ class NotificationService {
     return androidGranted && iosGranted && macGranted;
   }
 
-  // Serialise syncSchedules calls so rapid invocations don't race and leave
-  // the notification list in a partially-cancelled state (M-5).
   Future<void> _syncFuture = Future.value();
 
-  /// Reschedules all local notifications based on Supabase settings + fixed expenses.
-  /// [rules] provides per-expense is_enabled / remindDaysBefore / remindAt overrides.
   Future<void> syncSchedules({
     required NotificationSetting setting,
     required List<FixedExpense> activeFixedExpenses,
@@ -152,10 +145,7 @@ class NotificationService {
     List<NotificationRule> rules = const [],
   }) async {
     var id = _fixedExpenseIdStart;
-    // Only schedule monthly fixed expenses (cycle == 'monthly')
     for (final expense in expenses.where((e) => e.isActive && e.cycle == 'monthly')) {
-      // Per-expense rule overrides: is_enabled, remindDaysBefore, remindAt.
-      // Falls back to defaults (enabled, 1 day before, 09:00) if no rule exists.
       final rule = rules.where((r) => r.fixedExpenseId == expense.id).firstOrNull;
       if (rule != null && !rule.isEnabled) continue;
 
@@ -163,7 +153,6 @@ class NotificationService {
       final remindAt = rule?.remindAt ?? '09:00';
 
       for (var monthOffset = 0; monthOffset < 6; monthOffset++) {
-        // Guard against hitting the device alarm limit (L-4).
         if (id >= _fixedExpenseIdMax) {
           debugPrint(
             '[NotificationService] Notification ID limit reached '
@@ -229,8 +218,6 @@ class NotificationService {
     String remindAt = '09:00',
   }) {
     final now = tz.TZDateTime.now(tz.local);
-    // Use Dart's DateTime for overflow-safe month arithmetic (month > 12
-    // normalises automatically), then construct TZDateTime from the result.
     final rawTarget = DateTime(now.year, now.month + monthOffset, 1);
     final rawLastDay = DateTime(rawTarget.year, rawTarget.month + 1, 0);
     final lastDay = rawLastDay.day;
