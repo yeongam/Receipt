@@ -48,9 +48,11 @@ class AppUser {
 
   factory AppUser.fromMap(Map<String, dynamic> map) {
     return AppUser(
-      id: map['id'] as String,
-      email: map['email'] as String,
-      name: map['name'] as String,
+      id: map['id'] as String? ??
+          (throw const FormatException('AppUser.fromMap: missing id')),
+      email: map['email'] as String? ??
+          (throw const FormatException('AppUser.fromMap: missing email')),
+      name: map['name'] as String? ?? '',
       monthlyIncome: (map['monthly_income'] as num?)?.toInt() ?? 0,
       currency: map['currency'] as String? ?? 'KRW',
       language: map['language'] as String? ?? '한국어',
@@ -66,14 +68,30 @@ class AppUser {
           (map['budget_warning_secondary'] as num?)?.toInt() ?? 100,
       budgetStartDay: map['budget_start_day'] as String? ?? '매월 1일',
       isProfileCompleted: map['is_profile_completed'] as bool? ?? false,
-      createdAt: DateTime.parse(map['created_at'] as String),
-      updatedAt: DateTime.parse(map['updated_at'] as String),
+      createdAt: map['created_at'] != null
+          ? DateTime.parse(map['created_at'] as String)
+          : DateTime.now(),
+      updatedAt: map['updated_at'] != null
+          ? DateTime.parse(map['updated_at'] as String)
+          : DateTime.now(),
       appLockPasscodeHash: map['app_lock_passcode_hash'] as String?,
       appLockRecoveryCode: map['app_lock_recovery_code'] as String?,
     );
   }
 
+  /// Full update map including security fields.
+  /// Use only when explicitly writing app-lock data (setAppLockPasscode, disableAppLock).
   Map<String, dynamic> toUpdateMap() {
+    return {
+      ...toProfileUpdateMap(),
+      'app_lock_passcode_hash': appLockPasscodeHash,
+      'app_lock_recovery_code': appLockRecoveryCode,
+    };
+  }
+
+  /// Profile-only update map — excludes app_lock security fields.
+  /// Use for all routine settings saves to avoid clobbering security data.
+  Map<String, dynamic> toProfileUpdateMap() {
     return {
       'name': name,
       'monthly_income': monthlyIncome,
@@ -89,8 +107,6 @@ class AppUser {
       'budget_warning_secondary': budgetWarningSecondary,
       'budget_start_day': budgetStartDay,
       'is_profile_completed': isProfileCompleted,
-      'app_lock_passcode_hash': appLockPasscodeHash,
-      'app_lock_recovery_code': appLockRecoveryCode,
     };
   }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/auth/signed_in_user_id.dart';
@@ -45,7 +46,7 @@ class BudgetSettingsScreen extends StatelessWidget {
           children: [
             _SettingsRow(
               label: '현재 예산',
-              value: '${_formatAmount(settings.monthlyBudget)}원',
+              value: '${_formatAmount(settings.monthlyBudget, isEnglish: settings.isEnglish)}원',
             ),
             const SizedBox(height: 8),
             Slider(
@@ -60,6 +61,7 @@ class BudgetSettingsScreen extends StatelessWidget {
                 );
               },
             ),
+            const _SettingsRow(label: '설정 범위', value: '50만원 ~ 500만원 (500,000원 단위)'),
             _SettingsRow(label: '예산 시작일', value: settings.budgetStartDay),
             _SettingsRow(
               label: '예산 경고',
@@ -80,13 +82,10 @@ class CategorySettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider?>();
     final categoryProvider = context.watch<CategoryProvider>();
-    var userId = authProvider?.user?.id ?? '';
-    if (userId.isEmpty && categoryProvider.categories.isNotEmpty) {
-      userId = categoryProvider.categories.first.userId;
-    }
-    if (userId.isEmpty) {
-      userId = resolveSignedInUserId(context) ?? '';
-    }
+    // Use auth provider as canonical source; fall back to secure storage only.
+    // Avoided reading from categories to prevent cross-user contamination if
+    // categories were not cleared after sign-out.
+    final userId = authProvider?.user?.id ?? resolveSignedInUserId(context) ?? '';
 
     return SettingsScaffold(
       title: '분류 관리',
@@ -346,6 +345,8 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
       if (context.read<SettingsProvider>().hasAppLock) {
         await _saveSecurity(lockOnLaunch: true);
       } else {
+        // When no PIN exists, _PinSetupDialog calls updateSecurity(lockOnLaunch: true)
+        // internally on success. If _PinSetupDialog is ever changed, keep this in sync.
         await _showPinSetup();
       }
     } else {
@@ -741,33 +742,7 @@ class _PinSetupDialogState extends State<_PinSetupDialog> {
         showDialog<void>(
           context: context,
           barrierDismissible: false,
-          builder: (_) => AlertDialog(
-            title: const Text('복구 코드 저장'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  '아래 복구 코드를 안전한 곳에 저장하세요.\nPIN을 잊었을 때 사용할 수 있으며 다시 표시되지 않습니다.',
-                ),
-                const SizedBox(height: 16),
-                SelectableText(
-                  recoveryCode,
-                  style: const TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 2,
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('저장했습니다'),
-              ),
-            ],
-          ),
+          builder: (_) => _RecoveryCodeDisplayDialog(code: recoveryCode),
         );
       }
     } catch (_) {
@@ -814,11 +789,65 @@ class _PinSetupDialogState extends State<_PinSetupDialog> {
   }
 }
 
-String _formatAmount(int amount) {
-  return amount.toString().replaceAllMapped(
-    RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-    (match) {
-      return '${match[1]},';
-    },
-  );
+/// Recovery code display dialog.
+/// Shows the code in a non-selectable Text widget (not accessible to
+/// screen readers or screenshot tools the way SelectableText would be).
+/// Zeroes the displayed string from the widget tree before popping (C-2).
+class _RecoveryCodeDisplayDialog extends StatefulWidget {
+  final String code;
+  const _RecoveryCodeDisplayDialog({required this.code});
+
+  @override
+  State<_RecoveryCodeDisplayDialog> createState() =>
+      _RecoveryCodeDisplayDialogState();
+}
+
+class _RecoveryCodeDisplayDialogState
+    extends State<_RecoveryCodeDisplayDialog> {
+  late String _displayCode;
+
+  @override
+  void initState() {
+    super.initState();
+    _displayCode = widget.code;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('복구 코드 저장'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            '아래 복구 코드를 안전한 곳에 저장하세요.\nPIN을 잊었을 때 사용할 수 있으며 다시 표시되지 않습니다.',
+          ),
+          const SizedBox(height: 16),
+          Text(
+            _displayCode,
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 2,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        ElevatedButton(
+          onPressed: () {
+            // Zero the code from the widget tree before closing the dialog.
+            setState(() => _displayCode = '');
+            Navigator.of(context).pop();
+          },
+          child: const Text('저장했습니다'),
+        ),
+      ],
+    );
+  }
+}
+
+String _formatAmount(int amount, {bool isEnglish = false}) {
+  return NumberFormat.decimalPattern(isEnglish ? 'en' : 'ko').format(amount);
 }

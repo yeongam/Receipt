@@ -156,9 +156,16 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   Future<bool> validateRecoveryCodeForUnlock(String code) async {
-    final hash = _user?.appLockRecoveryCode;
-    if (hash == null || hash.isEmpty) return false;
-    return _sha256(code) == hash;
+    final stored = _user?.appLockRecoveryCode;
+    if (stored == null || stored.isEmpty) return false;
+    if (stored.startsWith('pbkdf2rc:')) {
+      final parts = stored.split(':');
+      if (parts.length != 3) return false;
+      final derived = await compute(_doPbkdf2, [code, parts[1]]);
+      return derived == parts[2];
+    }
+    // Legacy plain SHA-256
+    return _sha256(code) == stored;
   }
 
   Future<void> disableAppLock() {
@@ -182,17 +189,20 @@ class SettingsProvider extends ChangeNotifier {
 
   Future<void> setAppLockPasscode(String passcode) {
     final recovery = _generateRecoveryCode();
-    final salt = _generateSalt();
+    final pinSalt = _generateSalt();
+    final recoverySalt = _generateSalt();
     return _queueWork(() async {
       final user = _user;
       final authRepository = _authRepository;
       if (user == null || authRepository == null) return;
-      // Run PBKDF2 on a compute isolate — must complete before the save.
-      final hash = await compute(_doPbkdf2, [passcode, salt]);
+      // Run both PBKDF2 hashes on compute isolates — must complete before save.
+      // Recovery code uses PBKDF2+salt (pbkdf2rc: prefix) to match PIN security.
+      final pinHash = await compute(_doPbkdf2, [passcode, pinSalt]);
+      final recoveryHash = await compute(_doPbkdf2, [recovery, recoverySalt]);
       _user = await authRepository.updateProfile(
         user.copyWith(
-          appLockPasscodeHash: 'pbkdf2:$salt:$hash',
-          appLockRecoveryCode: _sha256(recovery),
+          appLockPasscodeHash: 'pbkdf2:$pinSalt:$pinHash',
+          appLockRecoveryCode: 'pbkdf2rc:$recoverySalt:$recoveryHash',
         ),
       );
       // Expose recovery code ONLY after the Supabase write succeeds.
@@ -208,6 +218,8 @@ class SettingsProvider extends ChangeNotifier {
 
   /// PBKDF2-HMAC-SHA256 with [_pbkdf2Iterations] rounds.
   /// Output: lowercase hex of the 32-byte derived key.
+  /// Derives exactly one 32-byte block (SHA-256 output size).
+  /// MUST be updated if the hash function ever changes.
   static const int _pbkdf2Iterations = 50000;
 
   static String _pbkdf2(String password, String saltHex) {
@@ -234,6 +246,7 @@ class SettingsProvider extends ChangeNotifier {
       }
     }
 
+    assert(dk.length == 32, '_pbkdf2: unexpected dk length ${dk.length}');
     return dk.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
   }
 
@@ -471,7 +484,9 @@ class SettingsProvider extends ChangeNotifier {
 
   Future<void> _queueWork(Future<void> Function() action) {
     final future = _pendingWork.then((_) => action());
-    _pendingWork = future.catchError((_) {});
+    _pendingWork = future.catchError((Object e) {
+      debugPrint('[SettingsProvider] queued work failed: $e');
+    });
     return future;
   }
 
@@ -530,7 +545,9 @@ class SettingsProvider extends ChangeNotifier {
     final authRepository = _authRepository;
     if (user == null || authRepository == null) return;
 
-    _user = await authRepository.updateProfile(
+    // Use updateProfileFields (not updateProfile) to avoid writing security
+    // fields on every routine settings change (H-2).
+    _user = await authRepository.updateProfileFields(
       user.copyWith(
         currency: _currency,
         language: _language,

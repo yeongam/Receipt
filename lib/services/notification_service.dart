@@ -13,6 +13,9 @@ class NotificationService {
   static final NotificationService instance = NotificationService._();
 
   static const int _dailyReminderId = 100;
+  // Fixed-expense alert IDs start at 1000 and are capped at 1499 (500 slots).
+  static const int _fixedExpenseIdStart = 1000;
+  static const int _fixedExpenseIdMax = 1500;
   static const String _channelId = 'integrated_expense_alerts';
   static const String _channelName = '통합 지출관리 알림';
   static const String _channelDescription = '리마인더와 고정지출 알림';
@@ -20,11 +23,13 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
 
-  bool _initialized = false;
+  // Cache the initialisation future so concurrent callers share one result
+  // and the plugin is never initialised twice (H-1).
+  Future<void>? _initFuture;
 
-  Future<void> initialize() async {
-    if (_initialized) return;
+  Future<void> initialize() => _initFuture ??= _doInitialize();
 
+  Future<void> _doInitialize() async {
     tz.initializeTimeZones();
     try {
       final timezoneName = await FlutterTimezone.getLocalTimezone();
@@ -34,7 +39,7 @@ class NotificationService {
     }
 
     const androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+        AndroidInitializationSettings('@drawable/ic_notification');
     const darwinSettings = DarwinInitializationSettings();
     const settings = InitializationSettings(
       android: androidSettings,
@@ -42,7 +47,6 @@ class NotificationService {
     );
 
     await _plugin.initialize(settings);
-    _initialized = true;
   }
 
   Future<bool> requestPermissions() async {
@@ -67,8 +71,27 @@ class NotificationService {
     return androidGranted && iosGranted && macGranted;
   }
 
+  // Serialise syncSchedules calls so rapid invocations don't race and leave
+  // the notification list in a partially-cancelled state (M-5).
+  Future<void> _syncFuture = Future.value();
+
   /// Reschedules all local notifications based on Supabase settings + fixed expenses.
   Future<void> syncSchedules({
+    required NotificationSetting setting,
+    required List<FixedExpense> activeFixedExpenses,
+    required bool isEnglish,
+  }) {
+    _syncFuture = _syncFuture.then(
+      (_) => _doSyncSchedules(
+        setting: setting,
+        activeFixedExpenses: activeFixedExpenses,
+        isEnglish: isEnglish,
+      ),
+    );
+    return _syncFuture;
+  }
+
+  Future<void> _doSyncSchedules({
     required NotificationSetting setting,
     required List<FixedExpense> activeFixedExpenses,
     required bool isEnglish,
@@ -121,10 +144,18 @@ class NotificationService {
     required List<FixedExpense> expenses,
     required bool isEnglish,
   }) async {
-    var id = 1000;
+    var id = _fixedExpenseIdStart;
     // Only schedule monthly fixed expenses (cycle == 'monthly')
     for (final expense in expenses.where((e) => e.isActive && e.cycle == 'monthly')) {
       for (var monthOffset = 0; monthOffset < 6; monthOffset++) {
+        // Guard against hitting the device alarm limit (L-4).
+        if (id >= _fixedExpenseIdMax) {
+          debugPrint(
+            '[NotificationService] Notification ID limit reached '
+            '($_fixedExpenseIdMax), skipping remaining alerts.',
+          );
+          return;
+        }
         try {
           final scheduledDate = _fixedExpenseAlertDate(
             dueDay: expense.billingDay,
@@ -158,7 +189,7 @@ class NotificationService {
       channelDescription: _channelDescription,
       importance: Importance.high,
       priority: Priority.high,
-      icon: '@mipmap/ic_launcher',
+      icon: '@drawable/ic_notification',
     );
     const iosDetails = DarwinNotificationDetails();
     return const NotificationDetails(android: androidDetails, iOS: iosDetails);

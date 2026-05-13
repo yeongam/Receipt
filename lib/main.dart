@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -223,6 +224,9 @@ class _AppLockScreen extends StatefulWidget {
 }
 
 class _AppLockScreenState extends State<_AppLockScreen> {
+  static const _storage = FlutterSecureStorage();
+  static const _attemptsKey = 'app_lock_failed_attempts';
+
   String _pin = '';
   int _failedAttempts = 0;
   static const int _maxAttempts = 5;
@@ -233,6 +237,12 @@ class _AppLockScreenState extends State<_AppLockScreen> {
   @override
   void initState() {
     super.initState();
+    // Restore persisted attempt count so a process kill doesn't reset the counter (H-3).
+    _storage.read(key: _attemptsKey).then((stored) {
+      if (stored != null && mounted) {
+        setState(() => _failedAttempts = int.tryParse(stored) ?? 0);
+      }
+    });
     if (widget.biometricEnabled) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _tryBiometric());
     }
@@ -253,7 +263,8 @@ class _AppLockScreenState extends State<_AppLockScreen> {
         options: const AuthenticationOptions(stickyAuth: true),
       );
       if (authenticated && mounted) {
-        widget.onUnlocked();
+        await _storage.delete(key: _attemptsKey);
+        if (mounted) widget.onUnlocked();
       } else {
         _biometricTriggered = false; // cancelled → allow retry via button
       }
@@ -288,12 +299,14 @@ class _AppLockScreenState extends State<_AppLockScreen> {
     if (!mounted) return;
     setState(() => _validating = false);
     if (ok) {
-      widget.onUnlocked();
+      await _storage.delete(key: _attemptsKey);
+      if (mounted) widget.onUnlocked();
     } else {
       setState(() {
         _failedAttempts++;
         _showError = true;
       });
+      await _storage.write(key: _attemptsKey, value: '$_failedAttempts');
       if (_failedAttempts >= _maxAttempts) {
         _showRecoveryDialog();
       }
@@ -316,7 +329,7 @@ class _AppLockScreenState extends State<_AppLockScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final bgColor = isDark ? AppColors.darkBackground : Colors.white;
+    final bgColor = isDark ? AppColors.darkBackground : theme.colorScheme.surface;
     final textColor = isDark ? AppColors.darkTextPrimary : AppColors.secondary;
 
     return Scaffold(
@@ -413,6 +426,7 @@ class _RecoveryCodeUnlockDialogState
     extends State<_RecoveryCodeUnlockDialog> {
   final _controller = TextEditingController();
   bool _showError = false;
+  bool _obscureCode = true;
   int _attempts = 0;
   static const int _maxAttempts = 5;
 
@@ -455,9 +469,16 @@ class _RecoveryCodeUnlockDialogState
           TextField(
             controller: _controller,
             enabled: !exhausted,
+            obscureText: _obscureCode,
             decoration: InputDecoration(
               labelText: '복구 코드',
               errorText: _showError ? '올바르지 않은 복구 코드입니다.' : null,
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscureCode ? Icons.visibility_off : Icons.visibility,
+                ),
+                onPressed: () => setState(() => _obscureCode = !_obscureCode),
+              ),
             ),
             onChanged: (_) => setState(() => _showError = false),
           ),
@@ -714,7 +735,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).colorScheme.surface,
           boxShadow: [
             BoxShadow(
               color: AppColors.secondary.withValues(alpha: 0.08),

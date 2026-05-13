@@ -82,8 +82,23 @@ class AuthRepository {
     await _client.auth.signOut();
   }
 
+  /// Full update — includes app_lock security fields.
+  /// Use only for setAppLockPasscode / disableAppLock paths.
   Future<AppUser> updateProfile(AppUser user) async {
     await _client.from('users').update(user.toUpdateMap()).eq('id', user.id);
+    final profile = await fetchProfile(user.id);
+    if (profile == null) throw Exception('프로필 업데이트 실패');
+    return profile;
+  }
+
+  /// Profile-only update — excludes app_lock security fields.
+  /// Use for all routine settings changes to avoid accidentally overwriting
+  /// the PIN hash or recovery code stored in Supabase.
+  Future<AppUser> updateProfileFields(AppUser user) async {
+    await _client
+        .from('users')
+        .update(user.toProfileUpdateMap())
+        .eq('id', user.id);
     final profile = await fetchProfile(user.id);
     if (profile == null) throw Exception('프로필 업데이트 실패');
     return profile;
