@@ -1,6 +1,55 @@
 # 통합 지출관리
 
-Flutter + Supabase 기반 개인 가계부 앱.
+Flutter + Supabase 기반 개인 가계부 앱 — 텐텐 팀 프로젝트
+
+---
+
+## 주요 기능
+
+| 화면 | 기능 |
+|------|------|
+| 홈 | 월별 수입/지출 요약, 최근 거래 내역 |
+| 내역 | 전체 거래 목록, 날짜/카테고리 필터 |
+| 리포트 | 도넛/바 차트 기반 지출 분석 |
+| 알림 | 로컬 푸시 알림 설정 |
+| 마이페이지 | 프로필 관리, 비밀번호 재설정 |
+| 설정 | 앱 잠금(생체인증), 테마, 언어 |
+
+---
+
+## 기술 스택
+
+| 분류 | 기술 |
+|------|------|
+| 프레임워크 | Flutter ≥ 3.38.4 |
+| 백엔드 | Supabase (PostgreSQL + Auth + Edge Functions) |
+| 상태관리 | Provider |
+| 차트 | fl_chart |
+| 보안 | flutter_secure_storage, local_auth, crypto |
+| 알림 | flutter_local_notifications, timezone |
+
+---
+
+## 프로젝트 구조
+
+```
+lib/
+├── core/           # 공통 상수, 테마, 유틸리티
+├── data/           # 모델, 레포지토리
+├── providers/      # 상태 관리
+├── screens/
+│   ├── auth/       # 로그인, 회원가입
+│   ├── home/       # 홈 대시보드
+│   ├── history/    # 거래 내역
+│   ├── report/     # 지출 리포트
+│   ├── mypage/     # 마이페이지
+│   ├── notification/ # 알림
+│   ├── settings/   # 앱 설정
+│   ├── intro/      # 온보딩
+│   └── shared/     # 공통 위젯
+├── services/       # API, 인증 서비스
+└── main.dart
+```
 
 ---
 
@@ -104,3 +153,11 @@ flutter build ipa --dart-define-from-file=.env
 - `SUPABASE_ANON_KEY`는 클라이언트 공개 키입니다. 데이터 보호는 Supabase RLS 정책으로 처리합니다.
 - `SUPABASE_SERVICE_ROLE_KEY`는 Edge Function 서버 측에서만 사용하며, 절대 클라이언트 코드에 포함하지 마세요.
 - `.env` 파일은 `.gitignore`에 등록되어 있습니다. 커밋하지 마세요.
+
+---
+
+## Contributors
+
+<a href="https://github.com/yeongam/Receipt/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=yeongam/Receipt" />
+</a>
