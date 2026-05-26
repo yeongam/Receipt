@@ -39,15 +39,15 @@ class _ReportScreenState extends State<ReportScreen>
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: Colors.white,
-        title: const Text('리포트'),
+        title: Text(context.tr('리포트', 'Report')),
         bottom: TabBar(
           controller: _tabController,
           labelColor: AppColors.primary,
           unselectedLabelColor: AppColors.textSecondary,
           indicatorColor: AppColors.primary,
-          tabs: const [
-            Tab(text: '출금 분석'),
-            Tab(text: '월별 추이'),
+          tabs: [
+            Tab(text: context.tr('출금 분석', 'Spending')),
+            Tab(text: context.tr('월별 추이', 'Trends')),
           ],
         ),
       ),
@@ -85,7 +85,7 @@ class _SpendingAnalysisTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text('${month.year}년 ${month.month}월', style: AppTextStyles.titleMedium),
+        Text(context.formatMonthYear(month), style: AppTextStyles.titleMedium),
         const SizedBox(height: 16),
         _DonutChartCard(
           totalExpense: totalExpense,
@@ -304,7 +304,7 @@ class _ComparisonCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('전월 대비', style: AppTextStyles.titleMedium),
+          Text(context.tr('전월 대비', 'vs Last Month'), style: AppTextStyles.titleMedium),
           const SizedBox(height: 8),
           Text(
             previousExpense == 0
@@ -359,7 +359,7 @@ class _MonthlyTrendTab extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('월별 입금/출금', style: AppTextStyles.titleMedium),
+              Text(context.tr('월별 입금/출금', 'Monthly Income / Expense'), style: AppTextStyles.titleMedium),
               const SizedBox(height: 20),
               SizedBox(
                 height: 170,
@@ -400,8 +400,12 @@ class _MonthlyTrendTab extends StatelessWidget {
                               ],
                             ),
                             const SizedBox(height: 8),
-                            Text('${trend.month.month}월',
-                                style: AppTextStyles.labelSmall),
+                            Text(
+                              context.isEnglish
+                                  ? trend.month.month.toString()
+                                  : '${trend.month.month}월',
+                              style: AppTextStyles.labelSmall,
+                            ),
                           ],
                         ),
                       ),
