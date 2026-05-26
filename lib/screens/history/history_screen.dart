@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/supabase/supabase_config.dart';
-import '../../core/utils/amount_format.dart';
+import '../../core/auth/signed_in_user_id.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/utils/app_preferences_format.dart';
 import '../../data/models/transaction.dart';
-import '../../providers/settings_provider.dart';
 import '../../providers/transaction_provider.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -16,11 +15,11 @@ class HistoryScreen extends StatefulWidget {
   State<HistoryScreen> createState() => _HistoryScreenState();
 }
 
+enum _TransactionFilter { all, income, expense }
+
 class _HistoryScreenState extends State<HistoryScreen> {
   late DateTime _selectedMonth;
-  String _selectedFilter = '전체';
-
-  final List<String> _filters = ['전체', '출금', '입금'];
+  _TransactionFilter _filter = _TransactionFilter.all;
 
   @override
   void initState() {
@@ -31,21 +30,25 @@ class _HistoryScreenState extends State<HistoryScreen> {
   void _changeMonth(int delta) {
     final next = DateTime(_selectedMonth.year, _selectedMonth.month + delta);
     setState(() => _selectedMonth = next);
-    final userId = SupabaseConfig.client.auth.currentUser?.id ?? '';
+    final userId = resolveSignedInUserId(context) ?? '';
     context.read<TransactionProvider>().loadMonth(userId, next, select: false);
   }
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<TransactionProvider>();
-    final settings = context.watch<SettingsProvider>();
     final month = _selectedMonth;
     final allTransactions = provider.transactionsForMonth(month);
     final visibleTransactions = allTransactions.where((transaction) {
-      if (_selectedFilter == '입금') return transaction.isIncome;
-      if (_selectedFilter == '출금') return transaction.isExpense;
+      if (_filter == _TransactionFilter.income) return transaction.isIncome;
+      if (_filter == _TransactionFilter.expense) return transaction.isExpense;
       return true;
     }).toList();
+    final filters = [
+      (_TransactionFilter.all, context.tr('전체', 'All')),
+      (_TransactionFilter.expense, context.tr('출금', 'Expense')),
+      (_TransactionFilter.income, context.tr('입금', 'Income')),
+    ];
     final grouped = _groupByDate(visibleTransactions);
     final income = provider.totalIncomeForMonth(month);
     final expense = provider.totalExpenseForMonth(month);
@@ -90,15 +93,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: Row(
               children: [
-                _MiniStat(label: '입금', amount: formatAmount(income), color: AppColors.accent),
+                _MiniStat(label: context.tr('입금', 'Income'), amount: context.formatCurrency(income), color: AppColors.accent),
                 const SizedBox(width: 16),
                 Container(width: 1, height: 32, color: AppColors.border),
                 const SizedBox(width: 16),
-                _MiniStat(label: '출금', amount: formatAmount(expense), color: AppColors.expense),
+                _MiniStat(label: context.tr('출금', 'Expense'), amount: context.formatCurrency(expense), color: AppColors.expense),
                 const SizedBox(width: 16),
                 Container(width: 1, height: 32, color: AppColors.border),
                 const SizedBox(width: 16),
-                _MiniStat(label: '잔액', amount: formatAmount(balance), color: AppColors.primary),
+                _MiniStat(label: context.tr('잔액', 'Balance'), amount: context.formatCurrency(balance), color: AppColors.primary),
               ],
             ),
           ),
@@ -109,14 +112,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
-                children: _filters.map((filter) {
-                  final isSelected = _selectedFilter == filter;
+                children: filters.map((entry) {
+                  final (value, label) = entry;
+                  final isSelected = _filter == value;
                   return Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: ChoiceChip(
-                      label: Text(filter),
+                      label: Text(label),
                       selected: isSelected,
-                      onSelected: (_) => setState(() => _selectedFilter = filter),
+                      onSelected: (_) => setState(() => _filter = value),
                       selectedColor: AppColors.primary,
                       backgroundColor: AppColors.background,
                       labelStyle: AppTextStyles.labelMedium.copyWith(
@@ -136,7 +140,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 return _DateGroup(
                   date: entry.key,
                   transactions: entry.value,
-                  compact: settings.compactView,
+                  compact: context.appSettings.compactView,
                 );
               }).toList(),
             ),
@@ -214,7 +218,7 @@ class _DateGroup extends StatelessWidget {
             children: [
               Text(date, style: AppTextStyles.labelMedium),
               Text(
-                '${isPositive ? '+' : '-'}${formatAmount(dailyTotal.abs())}원',
+                '${isPositive ? '+' : '-'}${context.formatCurrency(dailyTotal.abs())}',
                 style: AppTextStyles.labelMedium.copyWith(
                   color: isPositive ? AppColors.accent : AppColors.expense,
                   fontWeight: FontWeight.w600,
@@ -274,7 +278,7 @@ class _DateGroup extends StatelessWidget {
                           .copyWith(color: AppColors.textSecondary),
                     ),
                     trailing: Text(
-                      '${transaction.isIncome ? '+' : '-'}${formatAmount(transaction.amount)}원',
+                      '${transaction.isIncome ? '+' : '-'}${context.formatCurrency(transaction.amount)}',
                       style: AppTextStyles.titleSmall.copyWith(
                         color: color,
                         fontWeight: FontWeight.w700,

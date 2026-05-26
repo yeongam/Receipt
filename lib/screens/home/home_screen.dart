@@ -2,15 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../../core/utils/amount_format.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/utils/app_preferences_format.dart';
 import '../../data/models/transaction.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/transaction_provider.dart';
 import '../shared/transaction_entry_sheet.dart';
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+  final VoidCallback? onNavigateToHistory;
+  const HomeScreen({super.key, this.onNavigateToHistory});
 
   @override
   Widget build(BuildContext context) {
@@ -84,7 +85,7 @@ class HomeScreen extends StatelessWidget {
                 const SizedBox(height: 12),
                 _BudgetCard(expense: expense),
                 const SizedBox(height: 24),
-                const _SectionHeader(title: '최근 거래'),
+                _SectionHeader(title: '최근 거래', onShowMore: onNavigateToHistory),
                 const SizedBox(height: 12),
                 _RecentTransactions(
                   transactions: recent,
@@ -152,21 +153,10 @@ class _SummaryCard extends StatelessWidget {
                 style:
                     AppTextStyles.bodySmall.copyWith(color: Colors.white60)),
             const SizedBox(height: 4),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  formatAmount(expense),
-                  style: AppTextStyles.amount
-                      .copyWith(color: Colors.white, fontSize: 34),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4, left: 4),
-                  child: Text('원',
-                      style: AppTextStyles.titleMedium
-                          .copyWith(color: Colors.white70)),
-                ),
-              ],
+            Text(
+              context.formatCurrency(expense),
+              style: AppTextStyles.amount
+                  .copyWith(color: Colors.white, fontSize: 34),
             ),
             const SizedBox(height: 20),
             Row(
@@ -174,7 +164,7 @@ class _SummaryCard extends StatelessWidget {
                 _SummaryChip(
                   icon: Icons.arrow_downward_rounded,
                   label: '입금',
-                  amount: '${formatAmount(income)}원',
+                  amount: context.formatCurrency(income),
                   color: AppColors.accent,
                 ),
                 const SizedBox(width: 16),
@@ -183,7 +173,7 @@ class _SummaryCard extends StatelessWidget {
                 _SummaryChip(
                   icon: Icons.account_balance_wallet_outlined,
                   label: '잔액',
-                  amount: '${formatAmount(balance)}원',
+                  amount: context.formatCurrency(balance),
                   color: Colors.white,
                 ),
               ],
@@ -233,10 +223,12 @@ class _SummaryChip extends StatelessWidget {
 class _SectionHeader extends StatelessWidget {
   final String title;
   final bool showMore;
+  final VoidCallback? onShowMore;
 
   const _SectionHeader({
     required this.title,
     this.showMore = true,
+    this.onShowMore,
   });
 
   @override
@@ -248,9 +240,12 @@ class _SectionHeader extends StatelessWidget {
         children: [
           Text(title, style: AppTextStyles.titleLarge),
           if (showMore)
-            Text(
-              '전체보기',
-              style: AppTextStyles.labelMedium.copyWith(color: AppColors.primary),
+            GestureDetector(
+              onTap: onShowMore,
+              child: Text(
+                '전체보기',
+                style: AppTextStyles.labelMedium.copyWith(color: AppColors.primary),
+              ),
             ),
         ],
       ),
@@ -343,8 +338,10 @@ class _BudgetCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final total = context.watch<SettingsProvider>().monthlyBudget;
+    final settings = context.watch<SettingsProvider>();
+    final total = settings.monthlyBudget;
     final ratio = total == 0 ? 0.0 : (expense / total).clamp(0.0, 1.0);
+    final warningRatio = settings.budgetWarningPrimary / 100;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -370,7 +367,7 @@ class _BudgetCard extends StatelessWidget {
               Text(
                 '${(ratio * 100).toStringAsFixed(0)}% 사용',
                 style: AppTextStyles.labelMedium.copyWith(
-                  color: ratio > 0.8 ? AppColors.expense : AppColors.primary,
+                  color: ratio > warningRatio ? AppColors.expense : AppColors.primary,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -380,9 +377,9 @@ class _BudgetCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(formatAmount(expense),
+              Text(context.formatCurrency(expense),
                   style: AppTextStyles.amountSmall),
-              Text(' / ${formatAmount(total)}원', style: AppTextStyles.bodySmall),
+              Text(' / ${context.formatCurrency(total)}', style: AppTextStyles.bodySmall),
             ],
           ),
           const SizedBox(height: 12),
@@ -392,7 +389,7 @@ class _BudgetCard extends StatelessWidget {
               value: ratio,
               backgroundColor: AppColors.background,
               valueColor: AlwaysStoppedAnimation<Color>(
-                ratio > 0.8 ? AppColors.expense : AppColors.primary,
+                ratio > warningRatio ? AppColors.expense : AppColors.primary,
               ),
               minHeight: 8,
             ),
@@ -489,7 +486,7 @@ class _TransactionTile extends StatelessWidget {
         style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
       ),
       trailing: Text(
-        '$sign${formatAmount(transaction.amount)}원',
+        '$sign${context.formatCurrency(transaction.amount)}',
         style: AppTextStyles.titleMedium.copyWith(
           color: color,
           fontWeight: FontWeight.w700,
