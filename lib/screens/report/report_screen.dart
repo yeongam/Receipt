@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../../core/utils/amount_format.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/utils/app_preferences_format.dart';
 import '../../providers/category_provider.dart';
 import '../../providers/transaction_provider.dart';
 
@@ -130,11 +130,15 @@ class _DonutChartCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('카테고리별 출금', style: AppTextStyles.titleMedium),
+          Text(context.tr('카테고리별 출금', 'Spending by Category'), style: AppTextStyles.titleMedium),
           const SizedBox(height: 4),
-          Text('${formatAmount(totalExpense)}원 출금',
-              style:
-                  AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary)),
+          Text(
+            context.tr(
+              '${context.formatCurrency(totalExpense)} 출금',
+              '${context.formatCurrency(totalExpense)} spent',
+            ),
+            style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+          ),
           const SizedBox(height: 24),
           Center(
             child: SizedBox(
@@ -153,14 +157,15 @@ class _DonutChartCard extends StatelessWidget {
                   Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('총 출금',
-                          style: AppTextStyles.bodySmall
-                              .copyWith(color: AppColors.textSecondary)),
-                      Text(formatAmount(totalExpense),
-                          style: AppTextStyles.amountSmall.copyWith(fontSize: 20)),
-                      Text('원',
-                          style: AppTextStyles.bodySmall
-                              .copyWith(color: AppColors.textSecondary)),
+                      Text(
+                        context.tr('총 출금', 'Total'),
+                        style: AppTextStyles.bodySmall
+                            .copyWith(color: AppColors.textSecondary),
+                      ),
+                      Text(
+                        context.formatCurrency(totalExpense),
+                        style: AppTextStyles.amountSmall.copyWith(fontSize: 20),
+                      ),
                     ],
                   ),
                 ],
@@ -187,7 +192,7 @@ class _DonutChartCard extends StatelessWidget {
                     child: Text(entry.value.categoryName, style: AppTextStyles.bodySmall),
                   ),
                   Text(
-                    '${formatAmount(entry.value.amount)}원',
+                    context.formatCurrency(entry.value.amount),
                     style: AppTextStyles.bodySmall,
                   ),
                   const SizedBox(width: 8),
@@ -303,10 +308,16 @@ class _ComparisonCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             previousExpense == 0
-                ? '이전 달 데이터가 아직 없어요.'
+                ? context.tr('이전 달 데이터가 아직 없어요.', 'No data from last month.')
                 : savedMore
-                    ? '지난달보다 ${formatAmount(difference)}원 적게 썼어요.'
-                    : '지난달보다 ${formatAmount(difference.abs())}원 더 썼어요.',
+                    ? context.tr(
+                        '지난달보다 ${context.formatCurrency(difference)} 적게 썼어요.',
+                        'You spent ${context.formatCurrency(difference)} less than last month.',
+                      )
+                    : context.tr(
+                        '지난달보다 ${context.formatCurrency(difference.abs())} 더 썼어요.',
+                        'You spent ${context.formatCurrency(difference.abs())} more than last month.',
+                      ),
             style: AppTextStyles.bodySmall.copyWith(
               color: savedMore ? AppColors.accent : AppColors.expense,
               fontWeight: FontWeight.w600,

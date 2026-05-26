@@ -28,7 +28,7 @@ Future<void> openQuickAddHub(BuildContext context) {
   return showModalBottomSheet<void>(
     context: context,
     backgroundColor: Colors.transparent,
-    builder: (ctx) => const _QuickAddHubSheet(),
+    builder: (ctx) => _QuickAddHubSheet(hostContext: context),
   );
 }
 
@@ -60,7 +60,8 @@ void _showSaveError(BuildContext context, String message) {
 }
 
 class _QuickAddHubSheet extends StatelessWidget {
-  const _QuickAddHubSheet();
+  final BuildContext hostContext;
+  const _QuickAddHubSheet({required this.hostContext});
 
   @override
   Widget build(BuildContext context) {
@@ -119,10 +120,7 @@ class _QuickAddHubSheet extends StatelessWidget {
                     backgroundColor: AppColors.accentLight,
                     onTap: () {
                       Navigator.of(context).pop();
-                      openTransactionEntrySheet(
-                        context,
-                        TransactionType.income,
-                      );
+                      openTransactionEntrySheet(hostContext, TransactionType.income);
                     },
                   ),
                 ),
@@ -136,10 +134,7 @@ class _QuickAddHubSheet extends StatelessWidget {
                     backgroundColor: AppColors.expenseLight,
                     onTap: () {
                       Navigator.of(context).pop();
-                      openTransactionEntrySheet(
-                        context,
-                        TransactionType.expense,
-                      );
+                      openTransactionEntrySheet(hostContext, TransactionType.expense);
                     },
                   ),
                 ),
@@ -329,10 +324,16 @@ class _TransactionEntrySheetState extends State<_TransactionEntrySheet> {
                   final selectedCategory = availableCategories
                       .where((c) => c.id == effectiveCategoryId)
                       .firstOrNull;
-                  if (_titleController.text.trim().isEmpty ||
-                      selectedCategory == null ||
-                      amount == null ||
-                      amount <= 0) {
+                  if (_titleController.text.trim().isEmpty) {
+                    _showSaveError(context, context.tr('항목명을 입력하세요.', 'Please enter a title.'));
+                    return;
+                  }
+                  if (selectedCategory == null) {
+                    _showSaveError(context, context.tr('분류를 선택하세요.', 'Please select a category.'));
+                    return;
+                  }
+                  if (amount == null || amount <= 0) {
+                    _showSaveError(context, context.tr('유효한 금액을 입력하세요.', 'Please enter a valid amount.'));
                     return;
                   }
 

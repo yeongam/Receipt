@@ -86,11 +86,25 @@ class TransactionProvider extends ChangeNotifier {
     required int count,
   }) async {
     final now = DateTime.now();
-    final futures = List.generate(count, (i) {
+    final futures = List<Future<MonthlyTrend>>.generate(count, (i) {
       final monthOffset = count - 1 - i;
       final dt = DateTime(now.year, now.month - monthOffset);
-      final key = '${dt.year}-${dt.month.toString().padLeft(2, '0')}';
+      final key = _monthKey(dt);
+
+      if (_transactionsByMonth.containsKey(key)) {
+        final txs = _transactionsByMonth[key]!;
+        final income =
+            txs.where((t) => t.isIncome).fold(0, (sum, t) => sum + t.amount);
+        final expense =
+            txs.where((t) => t.isExpense).fold(0, (sum, t) => sum + t.amount);
+        return Future.value(MonthlyTrend(month: dt, income: income, expense: expense));
+      }
+
       return _repo.fetchByMonth(userId, key).then((txs) {
+        _transactionsByMonth[key] = txs;
+        for (final tx in txs) {
+          _transactionById[tx.id] = tx;
+        }
         final income =
             txs.where((t) => t.isIncome).fold(0, (sum, t) => sum + t.amount);
         final expense =
@@ -195,6 +209,7 @@ class TransactionProvider extends ChangeNotifier {
     _transactionsByMonth.clear();
     _transactionById.clear();
     _monthlyTrends = [];
+    _currentUserId = null;
     _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
     notifyListeners();
   }
