@@ -58,7 +58,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: Colors.white,
-        title: const Text('거래 내역'),
+        title: Text(context.tr('거래 내역', 'Transactions')),
       ),
       body: Column(
         children: [
@@ -75,7 +75,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   constraints: const BoxConstraints(),
                 ),
                 const SizedBox(width: 8),
-                Text('${_selectedMonth.year}년 ${_selectedMonth.month}월',
+                Text(context.formatMonthYear(_selectedMonth),
                     style: AppTextStyles.titleLarge),
                 const SizedBox(width: 8),
                 IconButton(
@@ -151,11 +151,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 }
 
-Map<String, List<AppTransaction>> _groupByDate(List<AppTransaction> transactions) {
-  final Map<String, List<AppTransaction>> grouped = {};
+Map<DateTime, List<AppTransaction>> _groupByDate(List<AppTransaction> transactions) {
+  final Map<DateTime, List<AppTransaction>> grouped = {};
   for (final transaction in transactions) {
-    final key =
-        '${transaction.occurredAt.year}년 ${transaction.occurredAt.month}월 ${transaction.occurredAt.day}일';
+    final d = transaction.occurredAt;
+    final key = DateTime(d.year, d.month, d.day);
     grouped.putIfAbsent(key, () => []).add(transaction);
   }
   return grouped;
@@ -190,7 +190,7 @@ class _MiniStat extends StatelessWidget {
 }
 
 class _DateGroup extends StatelessWidget {
-  final String date;
+  final DateTime date;
   final List<AppTransaction> transactions;
   final bool compact;
 
@@ -216,7 +216,7 @@ class _DateGroup extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(date, style: AppTextStyles.labelMedium),
+              Text(context.formatFullDate(date), style: AppTextStyles.labelMedium),
               Text(
                 '${isPositive ? '+' : '-'}${context.formatCurrency(dailyTotal.abs())}',
                 style: AppTextStyles.labelMedium.copyWith(
