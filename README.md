@@ -158,6 +158,13 @@ flutter build ipa --dart-define-from-file=.env
 
 ## Contributors
 
-<a href="https://github.com/yeongam/Receipt/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=yeongam/Receipt" />
-</a>
+<table>
+  <tr>
+    <td align="center">
+      <a href="https://github.com/yeongam">
+        <img src="https://github.com/yeongam.png" width="72" /><br />
+        <sub><b>yeongam</b></sub>
+      </a>
+    </td>
+  </tr>
+</table>
