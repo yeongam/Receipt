@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../../core/utils/amount_format.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/utils/app_preferences_format.dart';
 import '../../providers/category_provider.dart';
 import '../../providers/transaction_provider.dart';
 
@@ -39,15 +39,15 @@ class _ReportScreenState extends State<ReportScreen>
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: Colors.white,
-        title: const Text('리포트'),
+        title: Text(context.tr('리포트', 'Report')),
         bottom: TabBar(
           controller: _tabController,
           labelColor: AppColors.primary,
           unselectedLabelColor: AppColors.textSecondary,
           indicatorColor: AppColors.primary,
-          tabs: const [
-            Tab(text: '출금 분석'),
-            Tab(text: '월별 추이'),
+          tabs: [
+            Tab(text: context.tr('출금 분석', 'Spending')),
+            Tab(text: context.tr('월별 추이', 'Trends')),
           ],
         ),
       ),
@@ -85,7 +85,7 @@ class _SpendingAnalysisTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text('${month.year}년 ${month.month}월', style: AppTextStyles.titleMedium),
+        Text(context.formatMonthYear(month), style: AppTextStyles.titleMedium),
         const SizedBox(height: 16),
         _DonutChartCard(
           totalExpense: totalExpense,
@@ -130,11 +130,15 @@ class _DonutChartCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('카테고리별 출금', style: AppTextStyles.titleMedium),
+          Text(context.tr('카테고리별 출금', 'Spending by Category'), style: AppTextStyles.titleMedium),
           const SizedBox(height: 4),
-          Text('${formatAmount(totalExpense)}원 출금',
-              style:
-                  AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary)),
+          Text(
+            context.tr(
+              '${context.formatCurrency(totalExpense)} 출금',
+              '${context.formatCurrency(totalExpense)} spent',
+            ),
+            style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+          ),
           const SizedBox(height: 24),
           Center(
             child: SizedBox(
@@ -153,14 +157,15 @@ class _DonutChartCard extends StatelessWidget {
                   Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('총 출금',
-                          style: AppTextStyles.bodySmall
-                              .copyWith(color: AppColors.textSecondary)),
-                      Text(formatAmount(totalExpense),
-                          style: AppTextStyles.amountSmall.copyWith(fontSize: 20)),
-                      Text('원',
-                          style: AppTextStyles.bodySmall
-                              .copyWith(color: AppColors.textSecondary)),
+                      Text(
+                        context.tr('총 출금', 'Total'),
+                        style: AppTextStyles.bodySmall
+                            .copyWith(color: AppColors.textSecondary),
+                      ),
+                      Text(
+                        context.formatCurrency(totalExpense),
+                        style: AppTextStyles.amountSmall.copyWith(fontSize: 20),
+                      ),
                     ],
                   ),
                 ],
@@ -187,7 +192,7 @@ class _DonutChartCard extends StatelessWidget {
                     child: Text(entry.value.categoryName, style: AppTextStyles.bodySmall),
                   ),
                   Text(
-                    '${formatAmount(entry.value.amount)}원',
+                    context.formatCurrency(entry.value.amount),
                     style: AppTextStyles.bodySmall,
                   ),
                   const SizedBox(width: 8),
@@ -299,14 +304,20 @@ class _ComparisonCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('전월 대비', style: AppTextStyles.titleMedium),
+          Text(context.tr('전월 대비', 'vs Last Month'), style: AppTextStyles.titleMedium),
           const SizedBox(height: 8),
           Text(
             previousExpense == 0
-                ? '이전 달 데이터가 아직 없어요.'
+                ? context.tr('이전 달 데이터가 아직 없어요.', 'No data from last month.')
                 : savedMore
-                    ? '지난달보다 ${formatAmount(difference)}원 적게 썼어요.'
-                    : '지난달보다 ${formatAmount(difference.abs())}원 더 썼어요.',
+                    ? context.tr(
+                        '지난달보다 ${context.formatCurrency(difference)} 적게 썼어요.',
+                        'You spent ${context.formatCurrency(difference)} less than last month.',
+                      )
+                    : context.tr(
+                        '지난달보다 ${context.formatCurrency(difference.abs())} 더 썼어요.',
+                        'You spent ${context.formatCurrency(difference.abs())} more than last month.',
+                      ),
             style: AppTextStyles.bodySmall.copyWith(
               color: savedMore ? AppColors.accent : AppColors.expense,
               fontWeight: FontWeight.w600,
@@ -348,7 +359,7 @@ class _MonthlyTrendTab extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('월별 입금/출금', style: AppTextStyles.titleMedium),
+              Text(context.tr('월별 입금/출금', 'Monthly Income / Expense'), style: AppTextStyles.titleMedium),
               const SizedBox(height: 20),
               SizedBox(
                 height: 170,
@@ -389,8 +400,12 @@ class _MonthlyTrendTab extends StatelessWidget {
                               ],
                             ),
                             const SizedBox(height: 8),
-                            Text('${trend.month.month}월',
-                                style: AppTextStyles.labelSmall),
+                            Text(
+                              context.isEnglish
+                                  ? trend.month.month.toString()
+                                  : '${trend.month.month}월',
+                              style: AppTextStyles.labelSmall,
+                            ),
                           ],
                         ),
                       ),

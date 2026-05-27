@@ -2,15 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../../core/utils/amount_format.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/utils/app_preferences_format.dart';
 import '../../data/models/transaction.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/transaction_provider.dart';
 import '../shared/transaction_entry_sheet.dart';
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+  final VoidCallback? onNavigateToHistory;
+  const HomeScreen({super.key, this.onNavigateToHistory});
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +53,7 @@ class HomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    '통합 지출관리',
+                    context.tr('통합 지출관리', 'My Finance'),
                     style: AppTextStyles.titleLarge
                         .copyWith(color: AppColors.secondary),
                   ),
@@ -73,18 +74,21 @@ class HomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 20),
                 ],
-                const _SectionHeader(title: '빠른 메뉴', showMore: false),
+                _SectionHeader(title: context.tr('빠른 메뉴', 'Quick Menu'), showMore: false),
                 const SizedBox(height: 12),
                 _QuickActions(
                   onIncomeTap: () => openTransactionEntrySheet(context, TransactionType.income),
                   onExpenseTap: () => openTransactionEntrySheet(context, TransactionType.expense),
                 ),
                 const SizedBox(height: 24),
-                const _SectionHeader(title: '이번 달 예산'),
+                _SectionHeader(title: context.tr('이번 달 예산', 'Monthly Budget')),
                 const SizedBox(height: 12),
                 _BudgetCard(expense: expense),
                 const SizedBox(height: 24),
-                const _SectionHeader(title: '최근 거래'),
+                _SectionHeader(
+                  title: context.tr('최근 거래', 'Recent Transactions'),
+                  onShowMore: onNavigateToHistory,
+                ),
                 const SizedBox(height: 12),
                 _RecentTransactions(
                   transactions: recent,
@@ -142,39 +146,28 @@ class _SummaryCard extends StatelessWidget {
                 const Icon(Icons.calendar_today_outlined,
                     color: Colors.white54, size: 14),
                 const SizedBox(width: 6),
-                Text('${month.year}년 ${month.month}월',
+                Text(context.formatMonthYear(month),
                     style: AppTextStyles.labelMedium
                         .copyWith(color: Colors.white70)),
               ],
             ),
             const SizedBox(height: 16),
-            Text('이번 달 출금',
+            Text(context.tr('이번 달 출금', 'This Month\'s Spending'),
                 style:
                     AppTextStyles.bodySmall.copyWith(color: Colors.white60)),
             const SizedBox(height: 4),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  formatAmount(expense),
-                  style: AppTextStyles.amount
-                      .copyWith(color: Colors.white, fontSize: 34),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4, left: 4),
-                  child: Text('원',
-                      style: AppTextStyles.titleMedium
-                          .copyWith(color: Colors.white70)),
-                ),
-              ],
+            Text(
+              context.formatCurrency(expense),
+              style: AppTextStyles.amount
+                  .copyWith(color: Colors.white, fontSize: 34),
             ),
             const SizedBox(height: 20),
             Row(
               children: [
                 _SummaryChip(
                   icon: Icons.arrow_downward_rounded,
-                  label: '입금',
-                  amount: '${formatAmount(income)}원',
+                  label: context.tr('입금', 'Income'),
+                  amount: context.formatCurrency(income),
                   color: AppColors.accent,
                 ),
                 const SizedBox(width: 16),
@@ -182,8 +175,8 @@ class _SummaryCard extends StatelessWidget {
                 const SizedBox(width: 16),
                 _SummaryChip(
                   icon: Icons.account_balance_wallet_outlined,
-                  label: '잔액',
-                  amount: '${formatAmount(balance)}원',
+                  label: context.tr('잔액', 'Balance'),
+                  amount: context.formatCurrency(balance),
                   color: Colors.white,
                 ),
               ],
@@ -233,10 +226,12 @@ class _SummaryChip extends StatelessWidget {
 class _SectionHeader extends StatelessWidget {
   final String title;
   final bool showMore;
+  final VoidCallback? onShowMore;
 
   const _SectionHeader({
     required this.title,
     this.showMore = true,
+    this.onShowMore,
   });
 
   @override
@@ -248,9 +243,12 @@ class _SectionHeader extends StatelessWidget {
         children: [
           Text(title, style: AppTextStyles.titleLarge),
           if (showMore)
-            Text(
-              '전체보기',
-              style: AppTextStyles.labelMedium.copyWith(color: AppColors.primary),
+            GestureDetector(
+              onTap: onShowMore,
+              child: Text(
+                context.tr('전체보기', 'See All'),
+                style: AppTextStyles.labelMedium.copyWith(color: AppColors.primary),
+              ),
             ),
         ],
       ),
@@ -272,14 +270,14 @@ class _QuickActions extends StatelessWidget {
     final actions = [
       (
         icon: Icons.south_west_rounded,
-        label: '입금내역',
+        label: context.tr('입금내역', 'Income'),
         color: AppColors.accent,
         bg: AppColors.accentLight,
         onTap: onIncomeTap,
       ),
       (
         icon: Icons.north_east_rounded,
-        label: '출금내역',
+        label: context.tr('출금내역', 'Expense'),
         color: AppColors.expense,
         bg: AppColors.expenseLight,
         onTap: onExpenseTap,
@@ -343,8 +341,10 @@ class _BudgetCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final total = context.watch<SettingsProvider>().monthlyBudget;
+    final settings = context.watch<SettingsProvider>();
+    final total = settings.monthlyBudget;
     final ratio = total == 0 ? 0.0 : (expense / total).clamp(0.0, 1.0);
+    final warningRatio = settings.budgetWarningPrimary / 100;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -366,11 +366,14 @@ class _BudgetCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('월 예산', style: AppTextStyles.bodySmall),
+              Text(context.tr('월 예산', 'Budget'), style: AppTextStyles.bodySmall),
               Text(
-                '${(ratio * 100).toStringAsFixed(0)}% 사용',
+                context.tr(
+                  '${(ratio * 100).toStringAsFixed(0)}% 사용',
+                  '${(ratio * 100).toStringAsFixed(0)}% used',
+                ),
                 style: AppTextStyles.labelMedium.copyWith(
-                  color: ratio > 0.8 ? AppColors.expense : AppColors.primary,
+                  color: ratio > warningRatio ? AppColors.expense : AppColors.primary,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -380,9 +383,9 @@ class _BudgetCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(formatAmount(expense),
+              Text(context.formatCurrency(expense),
                   style: AppTextStyles.amountSmall),
-              Text(' / ${formatAmount(total)}원', style: AppTextStyles.bodySmall),
+              Text(' / ${context.formatCurrency(total)}', style: AppTextStyles.bodySmall),
             ],
           ),
           const SizedBox(height: 12),
@@ -392,7 +395,7 @@ class _BudgetCard extends StatelessWidget {
               value: ratio,
               backgroundColor: AppColors.background,
               valueColor: AlwaysStoppedAnimation<Color>(
-                ratio > 0.8 ? AppColors.expense : AppColors.primary,
+                ratio > warningRatio ? AppColors.expense : AppColors.primary,
               ),
               minHeight: 8,
             ),
@@ -489,7 +492,7 @@ class _TransactionTile extends StatelessWidget {
         style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
       ),
       trailing: Text(
-        '$sign${formatAmount(transaction.amount)}원',
+        '$sign${context.formatCurrency(transaction.amount)}',
         style: AppTextStyles.titleMedium.copyWith(
           color: color,
           fontWeight: FontWeight.w700,
