@@ -31,10 +31,18 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   bool _isDataReady = false;
   Offset? _fabOffset;
   bool _isDraggingFab = false;
+  late final List<Widget> _screens;
 
   @override
   void initState() {
     super.initState();
+    _screens = [
+      HomeScreen(onNavigateToHistory: () => setState(() => _currentIndex = 1)),
+      const HistoryScreen(),
+      const ReportScreen(),
+      const NotificationScreen(),
+      const MyPageScreen(),
+    ];
     _currentIndex = SettingsProvider.navigationIndexFor(
       context.read<SettingsProvider>().startScreen,
     );
@@ -121,13 +129,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     }
   }
 
-  final List<Widget> _screens = const [
-    HomeScreen(),
-    HistoryScreen(),
-    ReportScreen(),
-    NotificationScreen(),
-    MyPageScreen(),
-  ];
 
   final List<_NavItem> _navItems = const [
     _NavItem(

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../../core/utils/amount_format.dart';
+import '../../core/utils/app_preferences_format.dart';
 import '../../providers/settings_provider.dart';
 import 'settings_widgets.dart';
 
@@ -21,7 +21,7 @@ class BudgetSettingsScreen extends StatelessWidget {
           children: [
             SettingsRow(
               label: '현재 예산',
-              value: '${formatAmount(settings.monthlyBudget, isEnglish: settings.isEnglish)}원',
+              value: context.formatCurrency(settings.monthlyBudget),
             ),
             const SizedBox(height: 8),
             Slider(
