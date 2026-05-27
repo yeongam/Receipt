@@ -156,28 +156,36 @@ class _SummaryCard extends StatelessWidget {
                 style:
                     AppTextStyles.bodySmall.copyWith(color: Colors.white60)),
             const SizedBox(height: 4),
-            Text(
-              context.formatCurrency(expense),
-              style: AppTextStyles.amount
-                  .copyWith(color: Colors.white, fontSize: 34),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                context.formatCurrency(expense),
+                style: AppTextStyles.amount
+                    .copyWith(color: Colors.white, fontSize: 34),
+              ),
             ),
             const SizedBox(height: 20),
             Row(
               children: [
-                _SummaryChip(
-                  icon: Icons.arrow_downward_rounded,
-                  label: context.tr('입금', 'Income'),
-                  amount: context.formatCurrency(income),
-                  color: AppColors.accent,
+                Expanded(
+                  child: _SummaryChip(
+                    icon: Icons.arrow_downward_rounded,
+                    label: context.tr('입금', 'Income'),
+                    amount: context.formatCurrency(income),
+                    color: AppColors.accent,
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Container(width: 1, height: 36, color: Colors.white24),
                 const SizedBox(width: 16),
-                _SummaryChip(
-                  icon: Icons.account_balance_wallet_outlined,
-                  label: context.tr('잔액', 'Balance'),
-                  amount: context.formatCurrency(balance),
-                  color: Colors.white,
+                Expanded(
+                  child: _SummaryChip(
+                    icon: Icons.account_balance_wallet_outlined,
+                    label: context.tr('잔액', 'Balance'),
+                    amount: context.formatCurrency(balance),
+                    color: Colors.white,
+                  ),
                 ),
               ],
             ),
@@ -207,16 +215,22 @@ class _SummaryChip extends StatelessWidget {
       children: [
         Icon(icon, color: color, size: 18),
         const SizedBox(width: 6),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label,
-                style:
-                    AppTextStyles.labelSmall.copyWith(color: Colors.white54)),
-            Text(amount,
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label,
+                  style:
+                      AppTextStyles.labelSmall.copyWith(color: Colors.white54)),
+              Text(
+                amount,
                 style: AppTextStyles.titleSmall
-                    .copyWith(color: Colors.white, fontWeight: FontWeight.w600)),
-          ],
+                    .copyWith(color: Colors.white, fontWeight: FontWeight.w600),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -245,6 +259,7 @@ class _SectionHeader extends StatelessWidget {
           if (showMore)
             GestureDetector(
               onTap: onShowMore,
+              behavior: HitTestBehavior.opaque,
               child: Text(
                 context.tr('전체보기', 'See All'),
                 style: AppTextStyles.labelMedium.copyWith(color: AppColors.primary),
@@ -343,8 +358,12 @@ class _BudgetCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
     final total = settings.monthlyBudget;
-    final ratio = total == 0 ? 0.0 : (expense / total).clamp(0.0, 1.0);
+    // rawRatio may exceed 1.0 — used for colour logic and percentage display.
+    final rawRatio = total == 0 ? 0.0 : expense / total;
+    // progressRatio is clamped for the LinearProgressIndicator.
+    final progressRatio = rawRatio.clamp(0.0, 1.0);
     final warningRatio = settings.budgetWarningPrimary / 100;
+    final isOverWarning = rawRatio >= warningRatio;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -369,11 +388,11 @@ class _BudgetCard extends StatelessWidget {
               Text(context.tr('월 예산', 'Budget'), style: AppTextStyles.bodySmall),
               Text(
                 context.tr(
-                  '${(ratio * 100).toStringAsFixed(0)}% 사용',
-                  '${(ratio * 100).toStringAsFixed(0)}% used',
+                  '${(rawRatio * 100).toStringAsFixed(0)}% 사용',
+                  '${(rawRatio * 100).toStringAsFixed(0)}% used',
                 ),
                 style: AppTextStyles.labelMedium.copyWith(
-                  color: ratio > warningRatio ? AppColors.expense : AppColors.primary,
+                  color: isOverWarning ? AppColors.expense : AppColors.primary,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -392,10 +411,10 @@ class _BudgetCard extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: LinearProgressIndicator(
-              value: ratio,
+              value: progressRatio,
               backgroundColor: AppColors.background,
               valueColor: AlwaysStoppedAnimation<Color>(
-                ratio > warningRatio ? AppColors.expense : AppColors.primary,
+                isOverWarning ? AppColors.expense : AppColors.primary,
               ),
               minHeight: 8,
             ),

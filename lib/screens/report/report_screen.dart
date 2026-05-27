@@ -286,7 +286,17 @@ class _ComparisonCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final difference = previousExpense - currentExpense;
-    final savedMore = difference >= 0;
+    final savedMore = difference > 0;
+    final sameBudget = difference == 0;
+
+    final Color messageColor;
+    if (previousExpense == 0 || sameBudget) {
+      messageColor = AppColors.textSecondary;
+    } else if (savedMore) {
+      messageColor = AppColors.accent;
+    } else {
+      messageColor = AppColors.expense;
+    }
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -309,17 +319,19 @@ class _ComparisonCard extends StatelessWidget {
           Text(
             previousExpense == 0
                 ? context.tr('이전 달 데이터가 아직 없어요.', 'No data from last month.')
-                : savedMore
-                    ? context.tr(
-                        '지난달보다 ${context.formatCurrency(difference)} 적게 썼어요.',
-                        'You spent ${context.formatCurrency(difference)} less than last month.',
-                      )
-                    : context.tr(
-                        '지난달보다 ${context.formatCurrency(difference.abs())} 더 썼어요.',
-                        'You spent ${context.formatCurrency(difference.abs())} more than last month.',
-                      ),
+                : sameBudget
+                    ? context.tr('지난달과 지출이 같아요.', 'Same spending as last month.')
+                    : savedMore
+                        ? context.tr(
+                            '지난달보다 ${context.formatCurrency(difference)} 적게 썼어요.',
+                            'You spent ${context.formatCurrency(difference)} less than last month.',
+                          )
+                        : context.tr(
+                            '지난달보다 ${context.formatCurrency(difference.abs())} 더 썼어요.',
+                            'You spent ${context.formatCurrency(difference.abs())} more than last month.',
+                          ),
             style: AppTextStyles.bodySmall.copyWith(
-              color: savedMore ? AppColors.accent : AppColors.expense,
+              color: messageColor,
               fontWeight: FontWeight.w600,
             ),
           ),

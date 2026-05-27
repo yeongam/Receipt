@@ -370,6 +370,9 @@ class _TransactionEntrySheetState extends State<_TransactionEntrySheet> {
 
                   if (widget.type == TransactionType.expense &&
                       settings.budgetAlert) {
+                    // Guard: the host Scaffold may have been disposed while
+                    // the async addTransaction call was in-flight.
+                    if (!widget.hostContext.mounted) return;
                     final warningLine =
                         (settings.monthlyBudget *
                                 (settings.budgetWarningPrimary / 100))

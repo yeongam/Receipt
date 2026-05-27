@@ -27,11 +27,25 @@ class _HistoryScreenState extends State<HistoryScreen> {
     _selectedMonth = context.read<TransactionProvider>().selectedMonth;
   }
 
-  void _changeMonth(int delta) {
+  Future<void> _changeMonth(int delta) async {
     final next = DateTime(_selectedMonth.year, _selectedMonth.month + delta);
     setState(() => _selectedMonth = next);
     final userId = resolveSignedInUserId(context) ?? '';
-    context.read<TransactionProvider>().loadMonth(userId, next, select: false);
+    if (userId.isEmpty) return;
+    try {
+      await context
+          .read<TransactionProvider>()
+          .loadMonth(userId, next, select: false);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(
+          content: Text(
+            context.tr('데이터를 불러오지 못했습니다.', 'Failed to load data.'),
+          ),
+        ),
+      );
+    }
   }
 
   @override

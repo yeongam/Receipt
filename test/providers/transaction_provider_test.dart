@@ -114,6 +114,85 @@ void main() {
     );
     expect(repository.insertCallCount, 0);
   });
+
+  test('사용자 전환 시 이전 사용자 캐시가 새 사용자에 노출되지 않는다', () async {
+    // user-1 loads a month with data, then we switch to user-2.
+    // user-2 must see an empty list, not user-1's transactions.
+    final repository = _FakeTransactionRepository(
+      initialItems: [
+        _transaction(
+          id: 'user1-tx',
+          userId: 'user-1',
+          amount: 50000,
+          occurredAt: DateTime(2026, 5, 10),
+        ),
+      ],
+    );
+    final provider = TransactionProvider(repository);
+    final may2026 = DateTime(2026, 5);
+
+    await provider.loadMonth('user-1', may2026);
+    expect(provider.totalExpenseForMonth(may2026), 50000);
+
+    // Simulate sign-out / user switch.
+    provider.clear();
+
+    await provider.loadMonth('user-2', may2026);
+
+    // user-2 has no transactions; must not see user-1's data.
+    expect(provider.totalExpenseForMonth(may2026), 0);
+  });
+
+  test('loadMonth 진행 중 clear()를 호출하면 완료 후 캐시에 쓰지 않는다', () async {
+    // Arrange: repository responds after a small delay so we can interleave clear().
+    final repository = _DelayedTransactionRepository(
+      delay: const Duration(milliseconds: 20),
+      items: [
+        _transaction(
+          id: 'stale-tx',
+          userId: 'user-1',
+          amount: 99000,
+          occurredAt: DateTime(2026, 5, 10),
+        ),
+      ],
+    );
+    final provider = TransactionProvider(repository);
+    final may2026 = DateTime(2026, 5);
+
+    // Start loading but don't await yet.
+    final loadFuture = provider.loadMonth('user-1', may2026);
+
+    // Immediately clear (simulates sign-out while fetch is in-flight).
+    provider.clear();
+
+    // Wait for the fetch to complete.
+    await loadFuture;
+
+    // The stale write must not have happened after clear().
+    expect(provider.totalExpenseForMonth(may2026), 0);
+    expect(provider.isLoading, isFalse);
+  });
+
+  test('addTransaction과 loadMonthlyTrends 동시 실행 시 새 거래가 누락되지 않는다', () async {
+    final repository = _FakeTransactionRepository();
+    final provider = TransactionProvider(repository);
+
+    await provider.loadMonth('user-1', DateTime(2026, 5));
+
+    // Run both operations concurrently.
+    await Future.wait([
+      provider.addTransaction(
+        _transaction(
+          id: '',
+          amount: 15000,
+          occurredAt: DateTime(2026, 5, 15),
+        ),
+      ),
+      provider.loadMonthlyTrends('user-1', count: 1),
+    ]);
+
+    expect(provider.monthlyTrends.single.expense, 15000);
+  });
 }
 
 class _FakeTransactionRepository extends TransactionRepository {
@@ -147,6 +226,26 @@ class _FakeTransactionRepository extends TransactionRepository {
     );
     _items.add(created);
     return created;
+  }
+}
+
+/// Repository that introduces an artificial [delay] before returning results,
+/// enabling tests to interleave concurrent operations.
+class _DelayedTransactionRepository extends TransactionRepository {
+  final Duration delay;
+  final List<AppTransaction> items;
+
+  _DelayedTransactionRepository({required this.delay, required this.items});
+
+  @override
+  Future<List<AppTransaction>> fetchByMonth(String userId, String month) async {
+    await Future<void>.delayed(delay);
+    return items
+        .where((t) =>
+            t.userId == userId &&
+            '${t.occurredAt.year}-${t.occurredAt.month.toString().padLeft(2, '0')}' ==
+                month)
+        .toList();
   }
 }
 

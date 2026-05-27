@@ -12,6 +12,7 @@ import 'package:integrated_expense/data/repositories/notification_repository.dar
 import 'package:integrated_expense/providers/auth_provider.dart';
 import 'package:integrated_expense/providers/fixed_expense_provider.dart';
 import 'package:integrated_expense/providers/notification_rule_provider.dart';
+import 'package:integrated_expense/providers/settings_provider.dart';
 import 'package:integrated_expense/screens/notification/notification_screen.dart';
 
 void main() {
@@ -32,6 +33,10 @@ void main() {
           ),
           ChangeNotifierProvider<NotificationRuleProvider>.value(
             value: ruleProvider,
+          ),
+          // Required by _FixedExpenseTile which uses context.formatCurrency().
+          ChangeNotifierProvider(
+            create: (_) => SettingsProvider(storage: _MemorySettingsStore()),
           ),
         ],
         child: const MaterialApp(
@@ -61,7 +66,8 @@ void main() {
 
     expect(find.text('월세'), findsOneWidget);
     expect(find.text('매월 25일 · 월정기'), findsOneWidget);
-    expect(find.text('850,000원'), findsWidgets);
+    // SettingsProvider defaults to KRW → formatCurrency(850000) == '₩850,000'
+    expect(find.text('₩850,000'), findsWidgets);
   });
 }
 
@@ -114,5 +120,17 @@ class _FakeFixedExpenseRepository extends FixedExpenseRepository {
       createdAt: fe.createdAt,
       updatedAt: fe.updatedAt,
     );
+  }
+}
+
+class _MemorySettingsStore implements SettingsStore {
+  final Map<String, String> _values = {};
+
+  @override
+  Future<String?> read(String key) async => _values[key];
+
+  @override
+  Future<void> write(String key, String value) async {
+    _values[key] = value;
   }
 }
