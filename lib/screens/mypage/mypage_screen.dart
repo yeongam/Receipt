@@ -203,7 +203,10 @@ class MyPageScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: OutlinedButton(
-              onPressed: onLogout,
+              onPressed: () async {
+                await context.read<AuthProvider>().signOut();
+                onLogout();
+              },
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.expense,
                 side: const BorderSide(color: AppColors.expense),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/auth/signed_in_user_id.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/app_preferences_format.dart';
@@ -58,7 +59,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               children: [
                 IconButton(
                   onPressed: () async {
-                    final userId = provider.selectedMonth.year.toString();
+                    final userId = resolveSignedInUserId(context) ?? '';
                     final prevMonth = DateTime(month.year, month.month - 1);
                     await provider.loadMonth(userId, prevMonth);
                   },
@@ -81,7 +82,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 const SizedBox(width: 10),
                 IconButton(
                   onPressed: () async {
-                    final userId = provider.selectedMonth.year.toString();
+                    final userId = resolveSignedInUserId(context) ?? '';
                     final nextMonth = DateTime(month.year, month.month + 1);
                     await provider.loadMonth(userId, nextMonth);
                   },
