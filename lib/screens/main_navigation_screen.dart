@@ -37,11 +37,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   void initState() {
     super.initState();
     _screens = [
-      HomeScreen(onNavigateToHistory: () => setState(() => _currentIndex = 1)),
+      const HomeScreen(),
       const HistoryScreen(),
       const ReportScreen(),
       const NotificationScreen(),
-      const MyPageScreen(),
+      MyPageScreen(onLogout: () => setState(() => _currentIndex = 0)),
     ];
     _currentIndex = SettingsProvider.navigationIndexFor(
       context.read<SettingsProvider>().startScreen,

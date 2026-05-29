@@ -1,14 +1,14 @@
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/app_preferences_format.dart';
-import '../../providers/category_provider.dart';
 import '../../providers/transaction_provider.dart';
+import '../../providers/category_provider.dart';
 
 class ReportScreen extends StatefulWidget {
   const ReportScreen({super.key});
@@ -36,18 +36,25 @@ class _ReportScreenState extends State<ReportScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        title: Text(context.tr('리포트', 'Report')),
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
+        title: Text(
+          context.tr('리포트', 'Report'),
+          style: AppTextStyles.titleLarge.copyWith(
+            color: Theme.of(context).colorScheme.onSurface,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
         bottom: TabBar(
           controller: _tabController,
           labelColor: AppColors.primary,
-          unselectedLabelColor: AppColors.textSecondary,
+          unselectedLabelColor:
+              Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.62),
           indicatorColor: AppColors.primary,
           tabs: [
             Tab(text: context.tr('출금 분석', 'Spending')),
-            Tab(text: context.tr('월별 추이', 'Trends')),
+            Tab(text: context.tr('월별 추이', 'Monthly trend')),
           ],
         ),
       ),
@@ -76,16 +83,11 @@ class _SpendingAnalysisTab extends StatelessWidget {
     };
     final categories = provider.expenseCategoriesForMonth(month, categoryNames);
 
-    final prevYear = month.month == 1 ? month.year - 1 : month.year;
-    final prevMonthNum = month.month == 1 ? 12 : month.month - 1;
-    final prevTrend = provider.monthlyTrends.where((t) =>
-        t.month.year == prevYear && t.month.month == prevMonthNum);
-    final previousExpense = prevTrend.isEmpty ? 0 : prevTrend.first.expense;
-
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text(context.formatMonthYear(month), style: AppTextStyles.titleMedium),
+        Text(context.formatMonthYear(month),
+            style: AppTextStyles.titleMedium),
         const SizedBox(height: 16),
         _DonutChartCard(
           totalExpense: totalExpense,
@@ -94,7 +96,7 @@ class _SpendingAnalysisTab extends StatelessWidget {
         const SizedBox(height: 16),
         _ComparisonCard(
           currentExpense: totalExpense,
-          previousExpense: previousExpense,
+          previousExpense: 0,
         ),
       ],
     );
@@ -117,7 +119,7 @@ class _DonutChartCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -130,15 +132,13 @@ class _DonutChartCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(context.tr('카테고리별 출금', 'Spending by Category'), style: AppTextStyles.titleMedium),
+          Text(context.tr('카테고리별 출금', 'Spending by category'),
+              style: AppTextStyles.titleMedium),
           const SizedBox(height: 4),
           Text(
-            context.tr(
-              '${context.formatCurrency(totalExpense)} 출금',
-              '${context.formatCurrency(totalExpense)} spent',
-            ),
-            style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
-          ),
+              '${context.formatCurrency(totalExpense)} ${context.tr('출금', 'spent')}',
+              style:
+                  AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary)),
           const SizedBox(height: 24),
           Center(
             child: SizedBox(
@@ -157,15 +157,11 @@ class _DonutChartCard extends StatelessWidget {
                   Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        context.tr('총 출금', 'Total'),
-                        style: AppTextStyles.bodySmall
-                            .copyWith(color: AppColors.textSecondary),
-                      ),
-                      Text(
-                        context.formatCurrency(totalExpense),
-                        style: AppTextStyles.amountSmall.copyWith(fontSize: 20),
-                      ),
+                      Text(context.tr('총 출금', 'Total spent'),
+                          style: AppTextStyles.bodySmall
+                              .copyWith(color: AppColors.textSecondary)),
+                      Text(context.formatCurrency(totalExpense),
+                          style: AppTextStyles.amountSmall.copyWith(fontSize: 20)),
                     ],
                   ),
                 ],
@@ -249,28 +245,8 @@ class _DonutPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) {
-    if (oldDelegate is! _DonutPainter) return true;
-
-    if (!listEquals(palette, oldDelegate.palette)) {
-      return true;
-    }
-
-    if (categories.length != oldDelegate.categories.length) {
-      return true;
-    }
-
-    for (var i = 0; i < categories.length; i++) {
-      final current = categories[i];
-      final previous = oldDelegate.categories[i];
-      if (current.categoryId != previous.categoryId ||
-          current.categoryName != previous.categoryName ||
-          current.amount != previous.amount) {
-        return true;
-      }
-    }
-
-    return false;
+  bool shouldRepaint(covariant _DonutPainter oldDelegate) {
+    return oldDelegate.categories != categories;
   }
 }
 
@@ -286,22 +262,12 @@ class _ComparisonCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final difference = previousExpense - currentExpense;
-    final savedMore = difference > 0;
-    final sameBudget = difference == 0;
-
-    final Color messageColor;
-    if (previousExpense == 0 || sameBudget) {
-      messageColor = AppColors.textSecondary;
-    } else if (savedMore) {
-      messageColor = AppColors.accent;
-    } else {
-      messageColor = AppColors.expense;
-    }
+    final savedMore = difference >= 0;
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -314,24 +280,26 @@ class _ComparisonCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(context.tr('전월 대비', 'vs Last Month'), style: AppTextStyles.titleMedium),
+          Text(context.tr('전월 대비', 'Compared to last month'),
+              style: AppTextStyles.titleMedium),
           const SizedBox(height: 8),
           Text(
             previousExpense == 0
-                ? context.tr('이전 달 데이터가 아직 없어요.', 'No data from last month.')
-                : sameBudget
-                    ? context.tr('지난달과 지출이 같아요.', 'Same spending as last month.')
-                    : savedMore
-                        ? context.tr(
-                            '지난달보다 ${context.formatCurrency(difference)} 적게 썼어요.',
-                            'You spent ${context.formatCurrency(difference)} less than last month.',
-                          )
-                        : context.tr(
-                            '지난달보다 ${context.formatCurrency(difference.abs())} 더 썼어요.',
-                            'You spent ${context.formatCurrency(difference.abs())} more than last month.',
-                          ),
+                ? context.tr(
+                    '이전 달 데이터가 아직 없어요.',
+                    'No previous month data yet.',
+                  )
+                : savedMore
+                    ? context.tr(
+                        '지난달보다 ${context.formatCurrency(difference)} 적게 썼어요.',
+                        'You spent ${context.formatCurrency(difference)} less than last month.',
+                      )
+                    : context.tr(
+                        '지난달보다 ${context.formatCurrency(difference.abs())} 더 썼어요.',
+                        'You spent ${context.formatCurrency(difference.abs())} more than last month.',
+                      ),
             style: AppTextStyles.bodySmall.copyWith(
-              color: messageColor,
+              color: savedMore ? AppColors.accent : AppColors.expense,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -358,7 +326,7 @@ class _MonthlyTrendTab extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
@@ -371,7 +339,23 @@ class _MonthlyTrendTab extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(context.tr('월별 입금/출금', 'Monthly Income / Expense'), style: AppTextStyles.titleMedium),
+              Text(context.tr('월별 입금/출금', 'Monthly income / expense'),
+                  style: AppTextStyles.titleMedium),
+              const SizedBox(height: 14),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _TrendLegendItem(
+                    color: AppColors.accent,
+                    label: context.tr('수입', 'Income'),
+                  ),
+                  const SizedBox(width: 18),
+                  _TrendLegendItem(
+                    color: AppColors.expense,
+                    label: context.tr('지출', 'Expense'),
+                  ),
+                ],
+              ),
               const SizedBox(height: 20),
               SizedBox(
                 height: 170,
@@ -413,11 +397,10 @@ class _MonthlyTrendTab extends StatelessWidget {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              context.isEnglish
-                                  ? trend.month.month.toString()
-                                  : '${trend.month.month}월',
-                              style: AppTextStyles.labelSmall,
-                            ),
+                                context.isEnglish
+                                    ? DateFormat('MMM', 'en_US').format(trend.month)
+                                    : '${trend.month.month}월',
+                                style: AppTextStyles.labelSmall),
                           ],
                         ),
                       ),
@@ -433,3 +416,37 @@ class _MonthlyTrendTab extends StatelessWidget {
   }
 }
 
+class _TrendLegendItem extends StatelessWidget {
+  final Color color;
+  final String label;
+
+  const _TrendLegendItem({
+    required this.color,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: AppTextStyles.bodySmall.copyWith(
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+}

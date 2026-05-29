@@ -11,7 +11,7 @@ class IntroScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
@@ -33,6 +33,14 @@ class IntroScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 28),
+              Text(
+                '내돈내역',
+                style: AppTextStyles.headlineLarge.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 12),
               Text('로그인 및 이용으로\n경제적인 소비 습관을 만듭시다',
                   style: AppTextStyles.displayMedium.copyWith(height: 1.3)),
               const SizedBox(height: 16),

@@ -1,9 +1,40 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/utils/app_preferences_format.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../shared/pin_pad.dart';
 import 'settings_widgets.dart';
+
+class AccountSecurityScreen extends StatelessWidget {
+  final VoidCallback? onAccountDeleted;
+
+  const AccountSecurityScreen({
+    super.key,
+    this.onAccountDeleted,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SettingsScaffold(
+      title: context.tr('계정 및 보안', 'Account & Security'),
+      children: [
+        ListTile(
+          leading: const Icon(Icons.logout, color: Colors.red),
+          title: Text(
+            context.tr('로그아웃', 'Sign out'),
+            style: const TextStyle(color: Colors.red),
+          ),
+          onTap: () async {
+            await context.read<AuthProvider>().signOut();
+            if (context.mounted) onAccountDeleted?.call();
+          },
+        ),
+      ],
+    );
+  }
+}
 
 class SecuritySettingsScreen extends StatefulWidget {
   const SecuritySettingsScreen({super.key});
