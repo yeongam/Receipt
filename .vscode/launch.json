@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Flutter (dev)",
+      "request": "launch",
+      "type": "dart",
+      "toolArgs": ["--dart-define-from-file", ".env"]
+    },
+    {
+      "name": "Flutter (dev) — iOS",
+      "request": "launch",
+      "type": "dart",
+      "deviceId": "iPhone",
+      "toolArgs": ["--dart-define-from-file", ".env"]
+    },
+    {
+      "name": "Flutter (dev) — macOS",
+      "request": "launch",
+      "type": "dart",
+      "deviceId": "macos",
+      "toolArgs": ["--dart-define-from-file", ".env"]
+    }
+  ]
+}
