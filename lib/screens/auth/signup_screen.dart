@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/app_preferences_format.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/settings_provider.dart';
 import '../shared/edge_overscroll_background.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -27,10 +29,13 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _agreeRecovery = false;
   bool _agreeMarketing = false;
   bool _agreeUpdates = false;
+  bool _isLoading = false;
   final _nameController = TextEditingController();
   final _idController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _recoveryKeywordController = TextEditingController();
+  final _recoveryCodeController = TextEditingController();
 
   bool get _allAgreementsChecked =>
       _agreeTerms &&
@@ -58,6 +63,8 @@ class _SignupScreenState extends State<SignupScreen> {
     _idController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _recoveryKeywordController.dispose();
+    _recoveryCodeController.dispose();
     super.dispose();
   }
 
@@ -223,6 +230,46 @@ class _SignupScreenState extends State<SignupScreen> {
                                 ),
                                 obscureText: true,
                               ),
+                              const SizedBox(height: 52),
+                              _SignupFieldLabel(
+                                context.tr('가장 좋아하는 사람은?', 'Who is your favorite person?'),
+                              ),
+                              const SizedBox(height: 8),
+                              _SignupTextField(
+                                controller: _recoveryKeywordController,
+                                hintText: context.tr(
+                                  '복구 확인에 사용할 답변을 입력하세요',
+                                  'Enter an answer used for recovery verification',
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              _SignupFieldLabel(
+                                context.tr('복구용 확인 코드는?', 'What is your recovery code?'),
+                              ),
+                              const SizedBox(height: 8),
+                              _SignupTextField(
+                                controller: _recoveryCodeController,
+                                hintText: context.tr(
+                                  '예: NDNY2026 (영문/숫자, 대소문자 구분)',
+                                  'e.g. NDNY2026 (letters and numbers, case-sensitive)',
+                                ),
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
+                                  LengthLimitingTextInputFormatter(12),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                context.tr(
+                                  '이 정보는 아이디 찾기와 비밀번호 재설정 같은 복구 절차에서만 사용돼요. 가입 후 복구용 확인 코드는 수정할 수 없으니 꼭 기억해 주세요.',
+                                  'This information is only used for account recovery, such as ID lookup and password reset. The recovery code cannot be changed after sign-up, so please remember it.',
+                                ),
+                                style: AppTextStyles.bodySmall.copyWith(
+                                  color: secondaryTextColor,
+                                  height: 1.45,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                               const SizedBox(height: 24),
                               _AgreementSection(
                                 allChecked: _allAgreementsChecked,
@@ -302,19 +349,27 @@ class _SignupScreenState extends State<SignupScreen> {
                               SizedBox(
                                 width: double.infinity,
                                 child: ElevatedButton(
-                                  onPressed: () async {
+                                  onPressed: _isLoading ? null : () async {
                                     final name = _nameController.text.trim();
                                     final userId = _idController.text.trim();
                                     final password =
                                         _passwordController.text.trim();
                                     final confirmPassword =
                                         _confirmPasswordController.text.trim();
-                                    final isEnglish = context.isEnglish;
+                                    final recoveryKeyword =
+                                        _recoveryKeywordController.text.trim();
+                                    final recoveryCode =
+                                        _recoveryCodeController.text.trim();
+                                    final isEnglish = context
+                                        .read<SettingsProvider>()
+                                        .isEnglish;
 
                                     if (name.isEmpty ||
                                         userId.isEmpty ||
                                         password.isEmpty ||
-                                        confirmPassword.isEmpty) {
+                                        confirmPassword.isEmpty ||
+                                        recoveryKeyword.isEmpty ||
+                                        recoveryCode.isEmpty) {
                                       _showMessage(
                                         isEnglish
                                             ? 'Please fill in all sign-up fields.'
@@ -332,6 +387,16 @@ class _SignupScreenState extends State<SignupScreen> {
                                       return;
                                     }
 
+                                    if (recoveryCode.length < 4 ||
+                                        recoveryCode.length > 12) {
+                                      _showMessage(
+                                        isEnglish
+                                            ? 'Use a recovery code between 4 and 12 letters or numbers.'
+                                            : '복구 코드는 영문/숫자 4자 이상 12자 이하로 입력해 주세요. 대소문자는 구분돼요.',
+                                      );
+                                      return;
+                                    }
+
                                     if (!_hasRequiredAgreements) {
                                       _showMessage(
                                         isEnglish
@@ -341,22 +406,29 @@ class _SignupScreenState extends State<SignupScreen> {
                                       return;
                                     }
 
-                                    final auth = context.read<AuthProvider>();
-                                    final success = await auth.signUp(
+                                    setState(() => _isLoading = true);
+                                    final authProvider =
+                                        context.read<AuthProvider>();
+                                    final ok = await authProvider.signUp(
                                       username: userId,
                                       password: password,
+                                      name: name,
+                                      recoveryKeyword: recoveryKeyword,
+                                      recoveryCode: recoveryCode,
                                     );
                                     if (!mounted) return;
-                                    if (!success) {
-                                      _showMessage(
-                                        auth.errorMessage ??
-                                            (isEnglish
-                                                ? 'Sign-up failed. Please try again.'
-                                                : '회원가입에 실패했어요. 다시 시도해 주세요.'),
-                                      );
-                                      return;
+                                    setState(() => _isLoading = false);
+
+                                    if (ok) {
+                                      widget.onComplete();
+                                    } else {
+                                      final err = authProvider.errorMessage ??
+                                          (isEnglish
+                                              ? 'Sign-up failed.'
+                                              : '회원가입에 실패했어요.');
+                                      authProvider.clearError();
+                                      _showMessage(err);
                                     }
-                                    widget.onComplete();
                                   },
                                   style: ElevatedButton.styleFrom(
                                     padding: const EdgeInsets.symmetric(
@@ -449,11 +521,13 @@ class _SignupTextField extends StatelessWidget {
   final TextEditingController? controller;
   final String hintText;
   final bool obscureText;
+  final List<TextInputFormatter>? inputFormatters;
 
   const _SignupTextField({
     this.controller,
     required this.hintText,
     this.obscureText = false,
+    this.inputFormatters,
   });
 
   @override
@@ -461,6 +535,7 @@ class _SignupTextField extends StatelessWidget {
     return TextField(
       controller: controller,
       obscureText: obscureText,
+      inputFormatters: inputFormatters,
       style: AppTextStyles.bodyMedium.copyWith(
         fontSize: 15,
         color: Theme.of(context).colorScheme.onSurface,

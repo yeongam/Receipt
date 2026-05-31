@@ -22,11 +22,18 @@ class AuthRepository {
   Future<AppUser> signUp({
     required String username,
     required String password,
+    String name = '',
+    String recoveryKeyword = '',
+    String? recoveryCodeHash,
   }) async {
     final response = await _client.auth.signUp(
       email: _toFakeEmail(username),
       password: password,
-      data: {'username': username},
+      data: {
+        'username': username,
+        'name': name,
+        'recovery_keyword': recoveryKeyword,
+      },
     );
 
     final user = response.user;
@@ -49,10 +56,61 @@ class AuthRepository {
       profile = await fetchProfile(userId);
       if (profile != null) break;
     }
-    if (profile == null) {
-      throw Exception('프로필 생성에 실패했습니다. SQL 마이그레이션이 실행됐는지 확인하세요.');
+
+    if (recoveryCodeHash != null && recoveryCodeHash.isNotEmpty) {
+      try {
+        await _client
+            .from('users')
+            .update({'app_lock_recovery_code': recoveryCodeHash})
+            .eq('id', userId);
+      } catch (e) {
+        debugPrint('[AuthRepository] recovery code update failed: $e');
+      }
     }
-    return profile;
+
+    final finalProfile = await fetchProfile(userId);
+    if (finalProfile == null) throw Exception('프로필 생성에 실패했습니다.');
+    return finalProfile;
+  }
+
+  Future<String?> findUsernameByRecovery({
+    required String name,
+    required String recoveryKeyword,
+  }) async {
+    try {
+      final result = await _client.rpc(
+        'find_username_by_recovery',
+        params: {
+          'p_name': name,
+          'p_recovery_keyword': recoveryKeyword,
+        },
+      );
+      return result as String?;
+    } catch (e) {
+      debugPrint('[AuthRepository] findUsernameByRecovery failed: $e');
+      return null;
+    }
+  }
+
+  Future<bool> resetPasswordWithRecovery({
+    required String username,
+    required String recoveryCode,
+    required String newPassword,
+  }) async {
+    try {
+      final response = await _client.functions.invoke(
+        'reset-password-with-recovery-code',
+        body: {
+          'username': username,
+          'recoveryCode': recoveryCode,
+          'newPassword': newPassword,
+        },
+      );
+      return response.status == 200;
+    } catch (e) {
+      debugPrint('[AuthRepository] resetPasswordWithRecovery failed: $e');
+      return false;
+    }
   }
 
   Future<AppUser> signIn({

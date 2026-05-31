@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../data/models/app_user.dart';
@@ -65,11 +67,24 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> signUp({
     required String username,
     required String password,
+    String name = '',
+    String recoveryKeyword = '',
+    String recoveryCode = '',
   }) async {
     _errorMessage = null;
     try {
-      final user =
-          await _repo.signUp(username: username, password: password);
+      String? recoveryCodeHash;
+      if (recoveryCode.isNotEmpty) {
+        final hash = sha256.convert(utf8.encode(recoveryCode)).toString();
+        recoveryCodeHash = 'sha256:$hash';
+      }
+      final user = await _repo.signUp(
+        username: username,
+        password: password,
+        name: name,
+        recoveryKeyword: recoveryKeyword,
+        recoveryCodeHash: recoveryCodeHash,
+      );
       if (_isDisposed) return true;
       _user = user;
       _status = AuthStatus.authenticated;
@@ -77,6 +92,41 @@ class AuthProvider extends ChangeNotifier {
       return true;
     } catch (e) {
       if (_isDisposed) return false;
+      _errorMessage = e.toString();
+      _notifyIfActive();
+      return false;
+    }
+  }
+
+  Future<String?> findUsernameByRecovery({
+    required String name,
+    required String recoveryKeyword,
+  }) async {
+    try {
+      return await _repo.findUsernameByRecovery(
+        name: name,
+        recoveryKeyword: recoveryKeyword,
+      );
+    } catch (e) {
+      _errorMessage = e.toString();
+      _notifyIfActive();
+      return null;
+    }
+  }
+
+  Future<bool> resetPasswordWithRecovery({
+    required String username,
+    required String recoveryCode,
+    required String newPassword,
+  }) async {
+    _errorMessage = null;
+    try {
+      return await _repo.resetPasswordWithRecovery(
+        username: username,
+        recoveryCode: recoveryCode,
+        newPassword: newPassword,
+      );
+    } catch (e) {
       _errorMessage = e.toString();
       _notifyIfActive();
       return false;
