@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
@@ -41,9 +42,11 @@ class SettingsProvider extends ChangeNotifier {
     BudgetRepository? budgetRepository,
     NotificationRepository? notificationRepository,
     SettingsStore? storage,
+    Duration remoteLoadTimeout = const Duration(seconds: 5),
   }) : _authRepository = authRepository,
        _budgetRepository = budgetRepository,
        _notificationRepository = notificationRepository,
+       _remoteLoadTimeout = remoteLoadTimeout,
        _storage = storage ?? SecureSettingsStore() {
     _pendingWork = _loadFromStorage();
   }
@@ -64,6 +67,7 @@ class SettingsProvider extends ChangeNotifier {
   final AuthRepository? _authRepository;
   final BudgetRepository? _budgetRepository;
   final NotificationRepository? _notificationRepository;
+  final Duration _remoteLoadTimeout;
   final SettingsStore _storage;
 
   Future<void> _pendingWork = Future.value();
@@ -111,7 +115,8 @@ class SettingsProvider extends ChangeNotifier {
   bool get showWeeklySummary => _showWeeklySummary;
   String get themeLabel => _themeLabel;
 
-  String get themeToken => (_themeLabel == '다크' || _themeLabel == 'dark') ? 'dark' : 'light';
+  String get themeToken =>
+      (_themeLabel == '다크' || _themeLabel == 'dark') ? 'dark' : 'light';
 
   String get startScreen => _startScreen;
 
@@ -128,33 +133,46 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   Future<bool> validateAppLockPasscode(String passcode) async {
-    final stored = _user?.appLockPasscodeHash;
-    if (stored == null || stored.isEmpty) return false;
-    if (stored.startsWith('pbkdf2:')) {
-      final parts = stored.split(':');
-      if (parts.length != 3) return false;
-      final derived = await compute(_doPbkdf2, [passcode, parts[1]]);
-      return _timingSafeEquals(derived, parts[2]);
+    try {
+      final stored = _user?.appLockPasscodeHash;
+      if (stored == null || stored.isEmpty) return false;
+      if (stored.startsWith('pbkdf2:')) {
+        final parts = stored.split(':');
+        if (parts.length != 3) return false;
+        final derived = await compute(_doPbkdf2, [passcode, parts[1]]);
+        return _timingSafeEquals(derived, parts[2]);
+      }
+      if (stored.contains(':')) {
+        final idx = stored.indexOf(':');
+        final salt = stored.substring(0, idx);
+        final hash = stored.substring(idx + 1);
+        return _timingSafeEquals(_sha256(salt + passcode), hash);
+      }
+      return _timingSafeEquals(_sha256(passcode), stored);
+    } catch (e) {
+      debugPrint('[SettingsProvider] passcode validation failed: $e');
+      return false;
     }
-    if (stored.contains(':')) {
-      final idx = stored.indexOf(':');
-      final salt = stored.substring(0, idx);
-      final hash = stored.substring(idx + 1);
-      return _timingSafeEquals(_sha256(salt + passcode), hash);
-    }
-    return _timingSafeEquals(_sha256(passcode), stored);
   }
 
   Future<bool> validateRecoveryCodeForUnlock(String code) async {
-    final stored = _user?.appLockRecoveryCode;
-    if (stored == null || stored.isEmpty) return false;
-    if (stored.startsWith('pbkdf2rc:')) {
-      final parts = stored.split(':');
-      if (parts.length != 3) return false;
-      final derived = await compute(_doPbkdf2, [code, parts[1]]);
-      return _timingSafeEquals(derived, parts[2]);
+    try {
+      final stored = _user?.appLockRecoveryCode;
+      if (stored == null || stored.isEmpty) return false;
+      if (stored.startsWith('pbkdf2rc:')) {
+        final parts = stored.split(':');
+        if (parts.length != 3) return false;
+        final derived = await compute(_doPbkdf2, [code, parts[1]]);
+        return _timingSafeEquals(derived, parts[2]);
+      }
+      if (stored.startsWith('sha256:')) {
+        return _timingSafeEquals(_sha256(code), stored.substring(7));
+      }
+      return _timingSafeEquals(_sha256(code), stored);
+    } catch (e) {
+      debugPrint('[SettingsProvider] recovery code validation failed: $e');
+      return false;
     }
-    return _timingSafeEquals(_sha256(code), stored);
   }
 
   Future<void> disableAppLock() {
@@ -164,8 +182,8 @@ class SettingsProvider extends ChangeNotifier {
       if (user == null || authRepository == null) return;
       _user = await authRepository.updateProfile(
         user.copyWith(
-          appLockPasscodeHash: '',
-          appLockRecoveryCode: '',
+          appLockPasscodeHash: null,
+          appLockRecoveryCode: null,
           lockOnLaunch: false,
           biometricEnabled: false,
         ),
@@ -279,7 +297,10 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   Future<void> load({required AppUser user}) async {
-    await ready;
+    await ready.timeout(
+      const Duration(seconds: 5),
+      onTimeout: () => debugPrint('[Settings] storage ready timed out'),
+    );
 
     _resetAccountScopedValues();
     _user = user;
@@ -287,9 +308,9 @@ class SettingsProvider extends ChangeNotifier {
 
     final budgetRepository = _budgetRepository;
     if (budgetRepository != null) {
-      final budget = await budgetRepository.fetchByMonth(
-        user.id,
-        _currentBudgetMonth(),
+      final budget = await _loadOptionalRemote(
+        'budget settings',
+        () => budgetRepository.fetchByMonth(user.id, _currentBudgetMonth()),
       );
       if (budget != null) {
         _monthlyBudget = budget.totalLimit;
@@ -299,7 +320,10 @@ class SettingsProvider extends ChangeNotifier {
 
     final notificationRepository = _notificationRepository;
     if (notificationRepository != null) {
-      _notificationSetting = await notificationRepository.fetchSetting(user.id);
+      _notificationSetting = await _loadOptionalRemote(
+        'notification settings',
+        () => notificationRepository.fetchSetting(user.id),
+      );
       if (_notificationSetting != null) {
         _applyNotificationSettings(_notificationSetting!);
       }
@@ -308,6 +332,21 @@ class SettingsProvider extends ChangeNotifier {
     _isLoaded = true;
     _schedulePersist();
     notifyListeners();
+  }
+
+  Future<T?> _loadOptionalRemote<T>(
+    String label,
+    Future<T?> Function() action,
+  ) async {
+    try {
+      return await action().timeout(_remoteLoadTimeout);
+    } on TimeoutException {
+      debugPrint('[SettingsProvider] $label timed out');
+      return null;
+    } catch (e) {
+      debugPrint('[SettingsProvider] $label load failed: $e');
+      return null;
+    }
   }
 
   Future<void> updateMonthlyBudget(int value) {
@@ -337,6 +376,13 @@ class SettingsProvider extends ChangeNotifier {
     int? secondary,
     String? startDay,
   }) async {
+    final effectivePrimary = primary ?? _budgetWarningPrimary;
+    final effectiveSecondary = secondary ?? _budgetWarningSecondary;
+    if (effectiveSecondary < effectivePrimary) {
+      throw ArgumentError(
+        '예산 초과 경고 기준(%): 2차($effectiveSecondary) ≥ 1차($effectivePrimary) 이어야 합니다.',
+      );
+    }
     if (primary != null) _budgetWarningPrimary = primary;
     if (secondary != null) _budgetWarningSecondary = secondary;
     if (startDay != null) _budgetStartDay = startDay;

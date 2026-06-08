@@ -47,7 +47,8 @@ class FixedExpenseProvider extends ChangeNotifier {
   }
 
   Future<void> remove(String id) async {
-    await _repo.delete(id);
+    final existing = _items.where((e) => e.id == id).firstOrNull;
+    await _repo.delete(id, userId: existing?.userId);
     _items.removeWhere((e) => e.id == id);
     notifyListeners();
   }

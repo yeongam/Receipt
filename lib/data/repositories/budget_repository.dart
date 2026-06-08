@@ -26,7 +26,9 @@ class BudgetRepository {
   }
 
   Future<List<BudgetCategory>> fetchCategoriesByMonth(
-      String userId, String month) async {
+    String userId,
+    String month,
+  ) async {
     final data = await _client
         .from('budget_categories')
         .select()
@@ -44,7 +46,12 @@ class BudgetRepository {
     return BudgetCategory.fromMap(data);
   }
 
-  Future<void> deleteCategoryBudget(String id) async {
-    await _client.from('budget_categories').delete().eq('id', id);
+  Future<void> deleteCategoryBudget(String id, {String? userId}) async {
+    final effectiveUserId = userId ?? _client.auth.currentUser?.id;
+    var query = _client.from('budget_categories').delete().eq('id', id);
+    if (effectiveUserId != null && effectiveUserId.trim().isNotEmpty) {
+      query = query.eq('user_id', effectiveUserId);
+    }
+    await query;
   }
 }

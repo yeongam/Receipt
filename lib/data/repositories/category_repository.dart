@@ -33,7 +33,12 @@ class CategoryRepository {
     return AppCategory.fromMap(data);
   }
 
-  Future<void> delete(String id) async {
-    await _client.from('categories').delete().eq('id', id);
+  Future<void> delete(String id, {String? userId}) async {
+    final effectiveUserId = userId ?? _client.auth.currentUser?.id;
+    var query = _client.from('categories').delete().eq('id', id);
+    if (effectiveUserId != null && effectiveUserId.trim().isNotEmpty) {
+      query = query.eq('user_id', effectiveUserId);
+    }
+    await query;
   }
 }

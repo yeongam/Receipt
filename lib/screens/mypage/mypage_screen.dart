@@ -12,14 +12,19 @@ import '../notification/notification_screen.dart';
 import '../settings/settings_screens.dart';
 
 class MyPageScreen extends StatelessWidget {
-  const MyPageScreen({super.key});
+  final VoidCallback onLogout;
+
+  const MyPageScreen({
+    super.key,
+    required this.onLogout,
+  });
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<TransactionProvider>();
     final settings = context.watch<SettingsProvider>();
+    final auth = context.watch<AuthProvider>();
     final categoryProvider = context.watch<CategoryProvider>();
-    final authProvider = context.watch<AuthProvider>();
     final month = provider.selectedMonth;
     final transactions = provider.transactionsForMonth(month);
     final totalExpense = provider.totalExpenseForMonth(month);
@@ -29,8 +34,9 @@ class MyPageScreen extends StatelessWidget {
         : (((totalIncome - totalExpense) / totalIncome) * 100)
             .clamp(0, 100)
             .toDouble();
-    final userName = authProvider.user?.name ?? '';
-    final userUsername = authProvider.user?.username ?? '';
+
+    final profileName = auth.user?.name ?? '';
+    final profileId = auth.user?.username ?? '';
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -45,17 +51,28 @@ class MyPageScreen extends StatelessWidget {
         ),
         actions: [
           IconButton(
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                  builder: (_) => const AppPreferencesScreen()),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => AccountSecurityScreen(
+                    onAccountDeleted: onLogout,
+                  ),
+                ),
+              );
+            },
+            icon: const Icon(
+              Icons.settings_outlined,
+              color: AppColors.primary,
             ),
-            icon: const Icon(Icons.settings_outlined, color: AppColors.primary),
           ),
         ],
       ),
       body: ListView(
         children: [
-          _ProfileHeader(name: userName, profileId: userUsername),
+          _ProfileHeader(
+            name: profileName,
+            profileId: profileId,
+          ),
           const SizedBox(height: 16),
           _StatsRow(
             totalTransactions: transactions.length,
@@ -72,7 +89,8 @@ class MyPageScreen extends StatelessWidget {
                 trailing: context.formatCurrency(settings.monthlyBudget),
                 onTap: (context) => Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                      builder: (_) => const BudgetSettingsScreen()),
+                    builder: (_) => const BudgetSettingsScreen(),
+                  ),
                 ),
               ),
               _MenuItem(
@@ -80,19 +98,21 @@ class MyPageScreen extends StatelessWidget {
                 label: context.tr('고정지출 관리', 'Fixed expenses'),
                 onTap: (context) => Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                      builder: (_) => const NotificationScreen()),
+                    builder: (_) => const NotificationScreen(),
+                  ),
                 ),
               ),
               _MenuItem(
                 icon: Icons.category_outlined,
                 label: context.tr('분류 관리', 'Categories'),
                 trailing: context.tr(
-                  '${categoryProvider.categories.length}개',
-                  '${categoryProvider.categories.length}',
+                  '${categoryProvider.expenseCategories.length + categoryProvider.incomeCategories.length}개',
+                  '${categoryProvider.expenseCategories.length + categoryProvider.incomeCategories.length}',
                 ),
                 onTap: (context) => Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                      builder: (_) => const CategorySettingsScreen()),
+                    builder: (_) => const CategorySettingsScreen(),
+                  ),
                 ),
               ),
             ],
@@ -102,12 +122,12 @@ class MyPageScreen extends StatelessWidget {
             title: context.tr('앱 설정', 'App settings'),
             items: [
               _MenuItem(
-                icon: Icons.palette_outlined,
-                label: context.tr('화면 / 테마 설정', 'Display / Theme'),
-                trailing: settings.themeLabel,
+                icon: Icons.notifications_outlined,
+                label: context.tr('알림 설정', 'Alerts'),
                 onTap: (context) => Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                      builder: (_) => const AppPreferencesScreen()),
+                    builder: (_) => const AlertSettingsScreen(),
+                  ),
                 ),
               ),
               _MenuItem(
@@ -116,7 +136,18 @@ class MyPageScreen extends StatelessWidget {
                 trailing: '${settings.language} · ${settings.currency}',
                 onTap: (context) => Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                      builder: (_) => const LocaleSettingsScreen()),
+                    builder: (_) => const LocaleSettingsScreen(),
+                  ),
+                ),
+              ),
+              _MenuItem(
+                icon: Icons.palette_outlined,
+                label: context.tr('화면 / 테마 설정', 'Display / Theme'),
+                trailing: settings.themeLabel,
+                onTap: (context) => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const AppPreferencesScreen(),
+                  ),
                 ),
               ),
               _MenuItem(
@@ -124,19 +155,47 @@ class MyPageScreen extends StatelessWidget {
                 label: context.tr('보안 설정', 'Security'),
                 onTap: (context) => Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                      builder: (_) => const SecuritySettingsScreen()),
+                    builder: (_) => const SecuritySettingsScreen(),
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
           _MenuSection(
-            title: context.tr('앱 정보', 'App info'),
+            title: context.tr('지원', 'Support'),
             items: [
+              _MenuItem(
+                icon: Icons.help_outline_rounded,
+                label: context.tr('도움말', 'Help'),
+                onTap: (context) => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const HelpCenterScreen(),
+                  ),
+                ),
+              ),
+              _MenuItem(
+                icon: Icons.description_outlined,
+                label: context.tr('이용약관', 'Terms'),
+                onTap: (context) => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const TermsScreen(),
+                  ),
+                ),
+              ),
+              _MenuItem(
+                icon: Icons.privacy_tip_outlined,
+                label: context.tr('개인정보처리방침', 'Privacy Policy'),
+                onTap: (context) => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const PrivacyScreen(),
+                  ),
+                ),
+              ),
               _MenuItem(
                 icon: Icons.info_outline_rounded,
                 label: context.tr('앱 버전', 'App version'),
-                trailing: 'v1.0.0',
+                trailing: 'v1.2.0',
               ),
             ],
           ),
@@ -144,12 +203,16 @@ class MyPageScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: OutlinedButton(
-              onPressed: () => context.read<AuthProvider>().signOut(),
+              onPressed: () async {
+                await context.read<AuthProvider>().signOut();
+                onLogout();
+              },
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.expense,
                 side: const BorderSide(color: AppColors.expense),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
               child: Text(
@@ -169,70 +232,79 @@ class _ProfileHeader extends StatelessWidget {
   final String name;
   final String profileId;
 
-  const _ProfileHeader({required this.name, required this.profileId});
+  const _ProfileHeader({
+    required this.name,
+    required this.profileId,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final initial = name.isNotEmpty ? name[0] : '?';
+    final avatarLetter = name.trim().characters.firstOrNull ?? '?';
 
     return Container(
       color: Theme.of(context).colorScheme.surface,
       padding: const EdgeInsets.all(24),
-      child: Row(children: [
-        Container(
-          width: 70,
-          height: 70,
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [AppColors.primary, AppColors.primaryLight],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+      child: Row(
+        children: [
+          Container(
+            width: 70,
+            height: 70,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [AppColors.primary, AppColors.primaryLight],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              shape: BoxShape.circle,
             ),
-            shape: BoxShape.circle,
-          ),
-          child: Center(
-            child: Text(
-              initial,
-              style: const TextStyle(
+            child: Center(
+              child: Text(
+                avatarLetter,
+                style: AppTextStyles.headlineLarge.copyWith(
                   fontSize: 28,
                   fontWeight: FontWeight.w700,
-                  color: Colors.white),
-            ),
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(name, style: AppTextStyles.headlineSmall),
-            const SizedBox(height: 4),
-            Text(
-              profileId,
-              style: AppTextStyles.bodySmall.copyWith(
-                color: Theme.of(context)
-                    .colorScheme
-                    .onSurface
-                    .withValues(alpha: 0.68),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.primaryContainer,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                context.tr('가계부 사용자', 'Ledger user'),
-                style: AppTextStyles.labelMedium.copyWith(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
                 ),
               ),
             ),
-          ]),
-        ),
-      ]),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name, style: AppTextStyles.headlineSmall),
+                const SizedBox(height: 4),
+                Text(
+                  profileId,
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.68),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryContainer,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    context.tr('가계부 사용자', 'Ledger user'),
+                    style: AppTextStyles.labelMedium.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -253,22 +325,24 @@ class _StatsRow extends StatelessWidget {
     return Container(
       color: Theme.of(context).colorScheme.surface,
       padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
-      child: Row(children: [
-        _StatItem(
-          value: context.tr('$totalTransactions건', '$totalTransactions'),
-          label: context.tr('총 거래', 'Transactions'),
-        ),
-        _divider(context),
-        _StatItem(
-          value: context.formatCurrency(totalExpense, compact: true),
-          label: context.tr('이번 달 지출', 'Spent this month'),
-        ),
-        _divider(context),
-        _StatItem(
-          value: '${savingRate.toStringAsFixed(1)}%',
-          label: context.tr('저축률', 'Savings rate'),
-        ),
-      ]),
+      child: Row(
+        children: [
+          _StatItem(
+            value: context.tr('$totalTransactions건', '$totalTransactions'),
+            label: context.tr('총 거래', 'Transactions'),
+          ),
+          _divider(context),
+          _StatItem(
+            value: context.formatCurrency(totalExpense, compact: true),
+            label: context.tr('이번 달 지출', 'Spent this month'),
+          ),
+          _divider(context),
+          _StatItem(
+            value: '${savingRate.toStringAsFixed(1)}%',
+            label: context.tr('저축률', 'Savings rate'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -285,13 +359,16 @@ class _StatItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: Column(children: [
-        Text(value,
-            style:
-                AppTextStyles.headlineSmall.copyWith(color: AppColors.primary)),
-        const SizedBox(height: 4),
-        Text(label, style: AppTextStyles.bodySmall),
-      ]),
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: AppTextStyles.headlineSmall.copyWith(color: AppColors.primary),
+          ),
+          const SizedBox(height: 4),
+          Text(label, style: AppTextStyles.bodySmall),
+        ],
+      ),
     );
   }
 }
@@ -304,45 +381,53 @@ class _MenuSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-        child: Text(
-          title,
-          style: AppTextStyles.labelMedium.copyWith(
-            color:
-                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.68),
-            fontWeight: FontWeight.w600,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+          child: Text(
+            title,
+            style: AppTextStyles.labelMedium.copyWith(
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.68),
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
-      ),
-      Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.10),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.10),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            children: List.generate(items.length, (index) {
+              return Column(
+                children: [
+                  _MenuItemTile(item: items[index]),
+                  if (index < items.length - 1)
+                    Divider(
+                      height: 1,
+                      indent: 52,
+                      color: Theme.of(context).dividerColor,
+                    ),
+                ],
+              );
+            }),
+          ),
         ),
-        child: Column(
-          children: List.generate(items.length, (index) {
-            return Column(children: [
-              _MenuItemTile(item: items[index]),
-              if (index < items.length - 1)
-                Divider(
-                    height: 1,
-                    indent: 52,
-                    color: Theme.of(context).dividerColor),
-            ]);
-          }),
-        ),
-      ),
-    ]);
+      ],
+    );
   }
 }
 
@@ -379,25 +464,38 @@ class _MenuItemTile extends StatelessWidget {
         child: Icon(item.icon, color: AppColors.primary, size: 18),
       ),
       title: Text(item.label, style: AppTextStyles.titleSmall),
-      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-        if (item.trailing != null)
-          Text(
-            item.trailing!,
-            style: AppTextStyles.bodySmall.copyWith(
+      trailing: item.trailing != null
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  item.trailing!,
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.68),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.68),
+                  size: 18,
+                ),
+              ],
+            )
+          : Icon(
+              Icons.chevron_right_rounded,
               color: Theme.of(context)
                   .colorScheme
                   .onSurface
                   .withValues(alpha: 0.68),
+              size: 18,
             ),
-          ),
-        const SizedBox(width: 4),
-        Icon(
-          Icons.chevron_right_rounded,
-          color:
-              Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.68),
-          size: 18,
-        ),
-      ]),
       onTap: item.onTap == null ? null : () => item.onTap!(context),
     );
   }

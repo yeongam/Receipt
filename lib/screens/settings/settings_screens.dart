@@ -5,6 +5,6 @@ export 'category_settings_screen.dart';
 export 'help_center_screen.dart';
 export 'locale_settings_screen.dart';
 export 'privacy_screen.dart';
-export 'security_settings_screen.dart';
+export 'security_settings_screen.dart' show AccountSecurityScreen, SecuritySettingsScreen;
 export 'settings_widgets.dart';
 export 'terms_screen.dart';

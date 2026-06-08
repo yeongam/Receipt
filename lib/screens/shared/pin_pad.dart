@@ -27,7 +27,7 @@ class PinDots extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
         children: List.generate(
-          4,
+          6,
           (index) => AnimatedContainer(
             duration: const Duration(milliseconds: 180),
             width: index < length ? 18 : 14,

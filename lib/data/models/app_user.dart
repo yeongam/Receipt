@@ -19,6 +19,7 @@ class AppUser {
   final bool isProfileCompleted;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final String recoveryKeyword;
   final String? appLockPasscodeHash;
   final String? appLockRecoveryCode;
 
@@ -41,6 +42,7 @@ class AppUser {
     required this.isProfileCompleted,
     required this.createdAt,
     required this.updatedAt,
+    this.recoveryKeyword = '',
     this.appLockPasscodeHash,
     this.appLockRecoveryCode,
   });
@@ -73,6 +75,7 @@ class AppUser {
       updatedAt: map['updated_at'] != null
           ? DateTime.parse(map['updated_at'] as String)
           : DateTime.now(),
+      recoveryKeyword: map['recovery_keyword'] as String? ?? '',
       appLockPasscodeHash: map['app_lock_passcode_hash'] as String?,
       appLockRecoveryCode: map['app_lock_recovery_code'] as String?,
     );
@@ -102,6 +105,7 @@ class AppUser {
       'budget_warning_secondary': budgetWarningSecondary,
       'budget_start_day': budgetStartDay,
       'is_profile_completed': isProfileCompleted,
+      'recovery_keyword': recoveryKeyword,
     };
   }
 
@@ -120,6 +124,7 @@ class AppUser {
     int? budgetWarningSecondary,
     String? budgetStartDay,
     bool? isProfileCompleted,
+    String? recoveryKeyword,
     Object? appLockPasscodeHash = _notSet,
     Object? appLockRecoveryCode = _notSet,
   }) {
@@ -143,6 +148,7 @@ class AppUser {
       isProfileCompleted: isProfileCompleted ?? this.isProfileCompleted,
       createdAt: createdAt,
       updatedAt: updatedAt,
+      recoveryKeyword: recoveryKeyword ?? this.recoveryKeyword,
       appLockPasscodeHash: appLockPasscodeHash == _notSet
           ? this.appLockPasscodeHash
           : appLockPasscodeHash as String?,

@@ -19,13 +19,10 @@ class NotificationRepository {
   Future<NotificationSetting> updateSetting(NotificationSetting setting) async {
     final data = await _client
         .from('notification_settings')
-        .upsert(
-          {
-            'user_id': setting.userId,
-            ...setting.toUpdateMap(),
-          },
-          onConflict: 'user_id',
-        )
+        .upsert({
+          'user_id': setting.userId,
+          ...setting.toUpdateMap(),
+        }, onConflict: 'user_id')
         .select()
         .single();
     return NotificationSetting.fromMap(data);
@@ -54,12 +51,18 @@ class NotificationRepository {
         .from('notification_rules')
         .update(rule.toUpdateMap())
         .eq('id', rule.id)
+        .eq('user_id', rule.userId)
         .select()
         .single();
     return NotificationRule.fromMap(data);
   }
 
-  Future<void> deleteRule(String id) async {
-    await _client.from('notification_rules').delete().eq('id', id);
+  Future<void> deleteRule(String id, {String? userId}) async {
+    final effectiveUserId = userId ?? _client.auth.currentUser?.id;
+    var query = _client.from('notification_rules').delete().eq('id', id);
+    if (effectiveUserId != null && effectiveUserId.trim().isNotEmpty) {
+      query = query.eq('user_id', effectiveUserId);
+    }
+    await query;
   }
 }

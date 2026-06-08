@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/supabase/supabase_config.dart';
@@ -11,22 +13,40 @@ class AuthRepository {
   Stream<AuthState> get authStateChanges => _client.auth.onAuthStateChange;
 
   Future<AppUser?> fetchProfile(String userId) async {
-    final data =
-        await _client.from('users').select().eq('id', userId).maybeSingle();
+    final data = await _client
+        .from('users')
+        .select()
+        .eq('id', userId)
+        .maybeSingle();
     if (data == null) return null;
     return AppUser.fromMap(data);
   }
 
-  static String _toFakeEmail(String username) => '$username@receipt.app';
+  static String authEmailForUsername(String username) {
+    final normalized = username.trim();
+    if (!normalized.contains('@')) return '$normalized@receipt.app';
+
+    final encoded = base64Url
+        .encode(utf8.encode(normalized))
+        .replaceAll('=', '');
+    return 'u-$encoded@receipt.app';
+  }
 
   Future<AppUser> signUp({
     required String username,
     required String password,
+    String name = '',
+    String recoveryKeyword = '',
+    String? recoveryCodeHash,
   }) async {
     final response = await _client.auth.signUp(
-      email: _toFakeEmail(username),
+      email: authEmailForUsername(username),
       password: password,
-      data: {'username': username},
+      data: {
+        'username': username,
+        'name': name,
+        'recovery_keyword': recoveryKeyword,
+      },
     );
 
     final user = response.user;
@@ -37,8 +57,10 @@ class AuthRepository {
     final userId = user.id;
 
     try {
-      await _client
-          .rpc('seed_default_categories', params: {'p_user_id': userId});
+      await _client.rpc(
+        'seed_default_categories',
+        params: {'p_user_id': userId},
+      );
     } catch (e) {
       debugPrint('[AuthRepository] seed_default_categories failed: $e');
     }
@@ -49,10 +71,58 @@ class AuthRepository {
       profile = await fetchProfile(userId);
       if (profile != null) break;
     }
-    if (profile == null) {
-      throw Exception('프로필 생성에 실패했습니다. SQL 마이그레이션이 실행됐는지 확인하세요.');
+
+    if (recoveryCodeHash != null && recoveryCodeHash.isNotEmpty) {
+      try {
+        await _client
+            .from('users')
+            .update({'app_lock_recovery_code': recoveryCodeHash})
+            .eq('id', userId);
+      } catch (e) {
+        debugPrint('[AuthRepository] recovery code update failed: $e');
+      }
     }
-    return profile;
+
+    final finalProfile = await fetchProfile(userId);
+    if (finalProfile == null) throw Exception('프로필 생성에 실패했습니다.');
+    return finalProfile;
+  }
+
+  Future<String?> findUsernameByRecovery({
+    required String name,
+    required String recoveryKeyword,
+  }) async {
+    try {
+      final result = await _client.rpc(
+        'find_username_by_recovery',
+        params: {'p_name': name, 'p_recovery_keyword': recoveryKeyword},
+      );
+      return result as String?;
+    } catch (e) {
+      debugPrint('[AuthRepository] findUsernameByRecovery failed: $e');
+      return null;
+    }
+  }
+
+  Future<bool> resetPasswordWithRecovery({
+    required String username,
+    required String recoveryCode,
+    required String newPassword,
+  }) async {
+    try {
+      final response = await _client.functions.invoke(
+        'reset-password-with-recovery-code',
+        body: {
+          'username': username,
+          'recoveryCode': recoveryCode,
+          'newPassword': newPassword,
+        },
+      );
+      return response.status == 200;
+    } catch (e) {
+      debugPrint('[AuthRepository] resetPasswordWithRecovery failed: $e');
+      return false;
+    }
   }
 
   Future<AppUser> signIn({
@@ -60,7 +130,7 @@ class AuthRepository {
     required String password,
   }) async {
     final response = await _client.auth.signInWithPassword(
-      email: _toFakeEmail(username),
+      email: authEmailForUsername(username),
       password: password,
     );
 
