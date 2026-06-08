@@ -46,5 +46,4 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/images/
-    - assets/icons/
+    - assets/images/loading_logo.png

@@ -26,6 +26,9 @@ class MainNavigationScreen extends StatefulWidget {
 }
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
+  static const Duration _initialLoadTimeout = Duration(seconds: 12);
+  static const Duration _initialSectionTimeout = Duration(seconds: 5);
+
   int _currentIndex = 0;
   bool _isLocked = false;
   bool _isDataReady = false;
@@ -37,18 +40,21 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   void initState() {
     super.initState();
     _screens = [
-      HomeScreen(onNavigateToHistory: () => setState(() => _currentIndex = 1)),
+      const HomeScreen(),
       const HistoryScreen(),
       const ReportScreen(),
       const NotificationScreen(),
-      const MyPageScreen(),
+      MyPageScreen(onLogout: () => setState(() => _currentIndex = 0)),
     ];
     _currentIndex = SettingsProvider.navigationIndexFor(
       context.read<SettingsProvider>().startScreen,
     );
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       try {
-        await _loadInitialData();
+        await _loadInitialData().timeout(
+          _initialLoadTimeout,
+          onTimeout: () => debugPrint('[MainNav] _loadInitialData timed out'),
+        );
       } catch (e) {
         debugPrint('[MainNav] _loadInitialData failed: $e');
       }
@@ -80,26 +86,24 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     final fixedExpenseProvider = context.read<FixedExpenseProvider>();
 
     await Future.wait<void>([
-      transactionProvider.loadMonth(userId, now).catchError((Object e) {
-        debugPrint('[MainNav] loadMonth failed: $e');
-      }),
-      transactionProvider.loadMonthlyTrends(userId).catchError((Object e) {
-        debugPrint('[MainNav] loadMonthlyTrends failed: $e');
-      }),
-      categoryProvider.load(userId).catchError((Object e) {
-        debugPrint('[MainNav] loadCategories failed: $e');
-      }),
-      fixedExpenseProvider.load(userId).catchError((Object e) {
-        debugPrint('[MainNav] loadFixedExpenses failed: $e');
-      }),
-      context.read<NotificationRuleProvider>().load(userId).catchError((Object e) {
-        debugPrint('[MainNav] loadNotificationRules failed: $e');
-      }),
+      _loadSection(
+        'loadMonth',
+        () => transactionProvider.loadMonth(userId, now),
+      ),
+      _loadSection(
+        'loadMonthlyTrends',
+        () => transactionProvider.loadMonthlyTrends(userId),
+      ),
+      _loadSection('loadCategories', () => categoryProvider.load(userId)),
+      _loadSection(
+        'loadFixedExpenses',
+        () => fixedExpenseProvider.load(userId),
+      ),
+      _loadSection(
+        'loadNotificationRules',
+        () => context.read<NotificationRuleProvider>().load(userId),
+      ),
     ]);
-
-    if (!mounted) return;
-
-    await NotificationService.instance.initialize();
 
     if (!mounted) return;
     setState(() {
@@ -109,26 +113,40 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     });
   }
 
-  Future<void> _initNotificationService() async {
-    if (!mounted) return;
-    final settingsProvider = context.read<SettingsProvider>();
-    final notificationService = NotificationService.instance;
-    final granted = await notificationService.requestPermissions();
-    if (granted && mounted) {
-      final notificationSetting = settingsProvider.notificationSetting;
-      final fixedExpenses = context.read<FixedExpenseProvider>().items;
-      final rules = context.read<NotificationRuleProvider>().rules;
-      if (notificationSetting != null) {
-        await notificationService.syncSchedules(
-          setting: notificationSetting,
-          activeFixedExpenses: fixedExpenses,
-          isEnglish: settingsProvider.isEnglish,
-          rules: rules,
-        );
-      }
+  Future<void> _loadSection(
+    String label,
+    Future<void> Function() action,
+  ) async {
+    try {
+      await action().timeout(_initialSectionTimeout);
+    } catch (e) {
+      debugPrint('[MainNav] $label failed: $e');
     }
   }
 
+  Future<void> _initNotificationService() async {
+    if (!mounted) return;
+    try {
+      final settingsProvider = context.read<SettingsProvider>();
+      final notificationService = NotificationService.instance;
+      final granted = await notificationService.requestPermissions();
+      if (granted && mounted) {
+        final notificationSetting = settingsProvider.notificationSetting;
+        final fixedExpenses = context.read<FixedExpenseProvider>().items;
+        final rules = context.read<NotificationRuleProvider>().rules;
+        if (notificationSetting != null) {
+          await notificationService.syncSchedules(
+            setting: notificationSetting,
+            activeFixedExpenses: fixedExpenses,
+            isEnglish: settingsProvider.isEnglish,
+            rules: rules,
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('[MainNav] notification initialization failed: $e');
+    }
+  }
 
   final List<_NavItem> _navItems = const [
     _NavItem(
@@ -175,8 +193,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       );
     }
     if (!_isDataReady) {
-      final theme = Theme.of(context);
-      return Scaffold(backgroundColor: theme.scaffoldBackgroundColor);
+      return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: const Center(child: CircularProgressIndicator()),
+      );
     }
     return Scaffold(
       body: LayoutBuilder(
@@ -193,13 +213,19 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           );
 
           const leftRail = railInset;
-          final rightRail =
-              (constraints.maxWidth - fabSize - railInset).clamp(0.0, double.infinity);
-          final maxX =
-              (constraints.maxWidth - fabSize).clamp(0.0, double.infinity);
+          final rightRail = (constraints.maxWidth - fabSize - railInset).clamp(
+            0.0,
+            double.infinity,
+          );
+          final maxX = (constraints.maxWidth - fabSize).clamp(
+            0.0,
+            double.infinity,
+          );
           const minY = topMargin;
-          final maxY = (constraints.maxHeight - fabSize - bottomMargin)
-              .clamp(minY, double.infinity);
+          final maxY = (constraints.maxHeight - fabSize - bottomMargin).clamp(
+            minY,
+            double.infinity,
+          );
           final clampedOffset = Offset(
             _fabOffset!.dx.clamp(0.0, maxX),
             _fabOffset!.dy.clamp(minY, maxY),
@@ -210,8 +236,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             final current = _fabOffset!;
             final snapX =
                 (current.dx - leftRail).abs() < (current.dx - rightRail).abs()
-                    ? leftRail
-                    : rightRail;
+                ? leftRail
+                : rightRail;
             setState(() {
               _isDraggingFab = false;
               _fabOffset = Offset(snapX, current.dy.clamp(minY, maxY));

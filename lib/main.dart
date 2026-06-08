@@ -101,11 +101,14 @@ class _MyAppState extends State<MyApp> {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider(_authRepository)),
         ChangeNotifierProvider(
-            create: (_) => CategoryProvider(_categoryRepository)),
+          create: (_) => CategoryProvider(_categoryRepository),
+        ),
         ChangeNotifierProvider(
-            create: (_) => FixedExpenseProvider(_fixedExpenseRepository)),
+          create: (_) => FixedExpenseProvider(_fixedExpenseRepository),
+        ),
         ChangeNotifierProvider(
-            create: (_) => TransactionProvider(_transactionRepository)),
+          create: (_) => TransactionProvider(_transactionRepository),
+        ),
         ChangeNotifierProvider(
           create: (_) => SettingsProvider(
             authRepository: _authRepository,
@@ -169,14 +172,14 @@ class _RootGateState extends State<_RootGate> {
     final authStatus = context.watch<AuthProvider>().status;
 
     if (authStatus == AuthStatus.unknown) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     if (authStatus == AuthStatus.authenticated && _stage != _Stage.main) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _stage != _Stage.main) setState(() => _stage = _Stage.main);
+        if (mounted && _stage != _Stage.main) {
+          setState(() => _stage = _Stage.main);
+        }
       });
     }
 
@@ -184,6 +187,10 @@ class _RootGateState extends State<_RootGate> {
         (_stage == _Stage.main || _stage == _Stage.loading)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
+        // 콜백 예약 이후 인증 상태가 복구된 경우(레이스컨디션) intro 전환 취소
+        if (context.read<AuthProvider>().status == AuthStatus.authenticated) {
+          return;
+        }
         if (_stage == _Stage.main) {
           context.read<TransactionProvider>().clear();
           context.read<CategoryProvider>().clear();
@@ -197,8 +204,8 @@ class _RootGateState extends State<_RootGate> {
 
     return switch (_stage) {
       _Stage.loading => const Scaffold(
-          body: Center(child: CircularProgressIndicator()),
-        ),
+        body: Center(child: CircularProgressIndicator()),
+      ),
       _Stage.intro => IntroScreen(onStart: () => _moveTo(_Stage.login)),
       _Stage.login => LoginScreen(
         onLogin: () => _moveTo(_Stage.main),

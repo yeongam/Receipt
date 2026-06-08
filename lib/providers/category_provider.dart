@@ -17,6 +17,15 @@ class CategoryProvider extends ChangeNotifier {
       List.unmodifiable(_categories.where((c) => c.isExpense));
   bool get isLoading => _isLoading;
 
+  String categoryNameFor(String? id) {
+    if (id == null) return '';
+    return _categories
+            .where((c) => c.id == id)
+            .map((c) => c.name)
+            .firstOrNull ??
+        '';
+  }
+
   Future<void> load(String userId) async {
     if (userId.trim().isEmpty) {
       return;
@@ -46,7 +55,8 @@ class CategoryProvider extends ChangeNotifier {
   }
 
   Future<void> deleteCategory(String id) async {
-    await _repo.delete(id);
+    final existing = _categories.where((c) => c.id == id).firstOrNull;
+    await _repo.delete(id, userId: existing?.userId);
     _categories.removeWhere((c) => c.id == id);
     notifyListeners();
   }

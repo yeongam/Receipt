@@ -14,7 +14,8 @@ class CategorySettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider?>();
     final categoryProvider = context.watch<CategoryProvider>();
-    final userId = authProvider?.user?.id ?? resolveSignedInUserId(context) ?? '';
+    final userId =
+        authProvider?.user?.id ?? resolveSignedInUserId(context) ?? '';
 
     return SettingsScaffold(
       title: '분류 관리',
@@ -58,7 +59,9 @@ Future<void> _addCategory(
   if (trimmed.isEmpty || userId.isEmpty) return;
 
   final existing = context.read<CategoryProvider>().categories.any(
-    (category) => category.type == type && category.name == trimmed,
+    (category) =>
+        category.type == type &&
+        category.name.toLowerCase() == trimmed.toLowerCase(),
   );
   if (existing) return;
 

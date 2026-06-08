@@ -1,9 +1,8 @@
-platform :ios, '13.0'
+# Uncomment this line to define a global platform for your project
+# platform :ios, '13.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
-ENV['COPYFILE_DISABLE'] = '1'
-ENV['COPY_EXTENDED_ATTRIBUTES_DISABLE'] = '1'
 
 project 'Runner', {
   'Debug' => :debug,
@@ -28,13 +27,6 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 
 flutter_ios_podfile_setup
 
-def remove_orico_apple_double_files
-  project_root = File.expand_path('..', __dir__)
-  return unless project_root.start_with?('/Volumes/ORICO/')
-
-  system('/usr/bin/find', project_root, '-name', '._*', '-delete')
-end
-
 target 'Runner' do
   use_frameworks!
 
@@ -44,13 +36,8 @@ target 'Runner' do
   end
 end
 
-pre_install do |installer|
-  remove_orico_apple_double_files
-end
-
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
   end
-  remove_orico_apple_double_files
 end

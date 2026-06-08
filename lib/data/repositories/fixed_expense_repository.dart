@@ -45,7 +45,12 @@ class FixedExpenseRepository {
     return FixedExpense.fromMap(data);
   }
 
-  Future<void> delete(String id) async {
-    await _client.from('fixed_expenses').delete().eq('id', id);
+  Future<void> delete(String id, {String? userId}) async {
+    final effectiveUserId = userId ?? _client.auth.currentUser?.id;
+    var query = _client.from('fixed_expenses').delete().eq('id', id);
+    if (effectiveUserId != null && effectiveUserId.trim().isNotEmpty) {
+      query = query.eq('user_id', effectiveUserId);
+    }
+    await query;
   }
 }

@@ -1,348 +1,481 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/app_preferences_format.dart';
+import '../../providers/auth_provider.dart';
 
 class AccountRecoveryScreen extends StatelessWidget {
   const AccountRecoveryScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: Text(context.tr('계정 복구', 'Account Recovery')),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        appBar: AppBar(
+          title: Text(context.tr('아이디 / 비밀번호 찾기', 'Find ID / Password')),
+          bottom: TabBar(
+            tabs: [
+              Tab(text: context.tr('아이디 찾기', 'Find ID')),
+              Tab(text: context.tr('비밀번호 재설정', 'Reset Password')),
+            ],
+          ),
+        ),
+        body: const TabBarView(
+          children: [
+            _FindIdTab(),
+            _ResetPasswordTab(),
+          ],
+        ),
       ),
-      body: const _RecoveryForm(),
     );
   }
 }
 
-class _RecoveryForm extends StatefulWidget {
-  const _RecoveryForm();
+// ─── Find ID Tab ──────────────────────────────────────────────────────────────
+
+class _FindIdTab extends StatefulWidget {
+  const _FindIdTab();
 
   @override
-  State<_RecoveryForm> createState() => _RecoveryFormState();
+  State<_FindIdTab> createState() => _FindIdTabState();
 }
 
-class _RecoveryFormState extends State<_RecoveryForm> {
-  final _idCtrl = TextEditingController();
-  final _codeCtrl = TextEditingController();
-  bool _obscureCode = true;
-
-  final _pwCtrl = TextEditingController();
-  final _confirmCtrl = TextEditingController();
-  bool _obscurePw = true;
-  bool _obscureConfirm = true;
-
-  bool _isLoading = false;
-  bool _codeEntered = false;
-  String? _errorText;
-
-  static const int _maxAttempts = 5;
-  int _attempts = 0;
+class _FindIdTabState extends State<_FindIdTab> {
+  final _nameController = TextEditingController();
+  final _recoveryKeywordController = TextEditingController();
 
   @override
   void dispose() {
-    _idCtrl.dispose();
-    _codeCtrl.dispose();
-    _pwCtrl.dispose();
-    _confirmCtrl.dispose();
+    _nameController.dispose();
+    _recoveryKeywordController.dispose();
     super.dispose();
   }
 
-  void _proceedToNewPassword() {
-    if (_idCtrl.text.trim().isEmpty || _codeCtrl.text.trim().isEmpty) return;
-    setState(() {
-      _codeEntered = true;
-      _errorText = null;
-    });
+  void _showMessage(String message) {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    messenger
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Future<void> _resetPassword() async {
-    if (_attempts >= _maxAttempts) return;
-    final password = _pwCtrl.text;
-    final confirm = _confirmCtrl.text;
-
-    if (password.isEmpty) return;
-    if (password != confirm) {
-      setState(() => _errorText =
-          context.tr('비밀번호가 일치하지 않습니다.', 'Passwords do not match.'));
+  Future<void> _submit() async {
+    final isEnglish = Localizations.localeOf(context).languageCode == 'en';
+    final name = _nameController.text.trim();
+    final recoveryKeyword = _recoveryKeywordController.text.trim();
+    if (name.isEmpty || recoveryKeyword.isEmpty) {
+      _showMessage(isEnglish
+          ? 'Please enter both your name and recovery keyword.'
+          : '이름과 복구 키워드를 모두 입력해 주세요.');
       return;
     }
 
+    final username =
+        await context.read<AuthProvider>().findUsernameByRecovery(
+              name: name,
+              recoveryKeyword: recoveryKeyword,
+            );
+
+    if (!mounted) return;
+    if (username == null || username.isEmpty) {
+      _showMessage(isEnglish
+          ? 'We could not verify your recovery information.'
+          : '복구 정보를 확인하지 못했어요.');
+      return;
+    }
+    _showMessage(isEnglish
+        ? 'Your registered ID is $username.'
+        : '가입된 아이디는 $username예요.');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final secondaryTextColor =
+        Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.68);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 8),
+          Center(
+            child: Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: AppColors.primaryContainer,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(
+                Icons.person_search_rounded,
+                color: AppColors.primary,
+                size: 32,
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Center(
+            child: Text(
+              context.tr('아이디 찾기', 'Find ID'),
+              style: AppTextStyles.headlineSmall.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Center(
+            child: Text(
+              context.tr(
+                '가입 시 등록한 이름과 복구 키워드를 입력하세요.',
+                'Enter the name and recovery keyword you registered with.',
+              ),
+              textAlign: TextAlign.center,
+              style: AppTextStyles.bodySmall.copyWith(
+                color: secondaryTextColor,
+                height: 1.45,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          const SizedBox(height: 28),
+          Text(
+            context.tr('이름', 'Name'),
+            style: AppTextStyles.labelLarge.copyWith(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          _RecoveryTextField(
+            controller: _nameController,
+            hintText: context.tr('이름을 입력하세요', 'Enter your name'),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            context.tr('복구 키워드', 'Recovery Keyword'),
+            style: AppTextStyles.labelLarge.copyWith(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          _RecoveryTextField(
+            controller: _recoveryKeywordController,
+            hintText: context.tr(
+              '가입 시 입력한 복구 답변을 입력하세요',
+              'Enter the recovery answer you used at sign-up',
+            ),
+          ),
+          const SizedBox(height: 28),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _submit,
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                textStyle: AppTextStyles.titleMedium.copyWith(
+                  fontSize: 16,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              child: Text(context.tr('아이디 찾기', 'Find ID')),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Reset Password Tab ───────────────────────────────────────────────────────
+
+class _ResetPasswordTab extends StatefulWidget {
+  const _ResetPasswordTab();
+
+  @override
+  State<_ResetPasswordTab> createState() => _ResetPasswordTabState();
+}
+
+class _ResetPasswordTabState extends State<_ResetPasswordTab> {
+  final _idController = TextEditingController();
+  final _recoveryCodeController = TextEditingController();
+  final _newPasswordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+
+  bool _isVerified = false;
+  bool _isResetting = false;
+  String _verifiedUserId = '';
+  String _pendingRecoveryCode = '';
+
+  @override
+  void dispose() {
+    _idController.dispose();
+    _recoveryCodeController.dispose();
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  void _showMessage(String message) {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    messenger
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _submit() async {
+    final isEnglish = Localizations.localeOf(context).languageCode == 'en';
+    final userId = _idController.text.trim();
+    final recoveryCode = _recoveryCodeController.text.trim();
+    if (userId.isEmpty || recoveryCode.isEmpty) {
+      _showMessage(isEnglish
+          ? 'Please enter your ID and recovery code.'
+          : '아이디와 복구 코드를 모두 입력해 주세요.');
+      return;
+    }
     setState(() {
-      _isLoading = true;
-      _errorText = null;
+      _isVerified = true;
+      _verifiedUserId = userId;
+      _pendingRecoveryCode = recoveryCode;
     });
+    _showMessage(isEnglish
+        ? 'Identity verification is complete. Enter a new password.'
+        : '본인 확인이 완료됐어요. 새 비밀번호를 입력해 주세요.');
+  }
 
-    try {
-      final response = await Supabase.instance.client.functions.invoke(
-        'reset-password-with-recovery-code',
-        body: {
-          'username': _idCtrl.text.trim(),
-          'recoveryCode': _codeCtrl.text.trim(),
-          'newPassword': password,
-        },
-      );
+  Future<void> _resetPassword() async {
+    final isEnglish = Localizations.localeOf(context).languageCode == 'en';
+    final newPassword = _newPasswordController.text.trim();
+    final confirmPassword = _confirmPasswordController.text.trim();
 
-      if (!mounted) return;
+    if (newPassword.isEmpty || confirmPassword.isEmpty) {
+      _showMessage(isEnglish
+          ? 'Please enter and confirm your new password.'
+          : '새 비밀번호와 확인 비밀번호를 모두 입력해 주세요.');
+      return;
+    }
+    if (newPassword != confirmPassword) {
+      _showMessage(isEnglish
+          ? 'The new password and confirmation do not match.'
+          : '새 비밀번호와 확인 비밀번호가 일치하지 않아요.');
+      return;
+    }
+    if (newPassword.length < 6) {
+      _showMessage(isEnglish
+          ? 'Password must be at least 6 characters.'
+          : '비밀번호는 6자 이상이어야 해요.');
+      return;
+    }
 
-      final raw = response.data;
-      final data = raw is Map<String, dynamic> ? raw : null;
-      if (data?['success'] == true) {
-        _showSuccess();
-      } else {
-        _attempts++;
-        final err = data?['error'] as String? ?? 'unknown';
-        setState(() {
-          _errorText = switch (err) {
-            'invalid_credentials' => _attempts >= _maxAttempts
-                ? context.tr('시도 횟수를 초과했습니다.', 'Too many attempts.')
-                : context.tr(
-                    '아이디 또는 복구 코드가 올바르지 않습니다.',
-                    'Invalid ID or recovery code.',
-                  ),
-            'password_too_short' =>
-              context.tr('비밀번호는 6자 이상이어야 합니다.', 'Password must be at least 6 characters.'),
-            _ => context.tr('오류가 발생했습니다.', 'An error occurred.'),
-          };
-        });
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _errorText = e.toString());
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+    setState(() => _isResetting = true);
+    final ok =
+        await context.read<AuthProvider>().resetPasswordWithRecovery(
+              username: _verifiedUserId,
+              recoveryCode: _pendingRecoveryCode,
+              newPassword: newPassword,
+            );
+    if (!mounted) return;
+    setState(() => _isResetting = false);
+
+    if (ok) {
+      _showMessage(isEnglish
+          ? 'Your password has been changed. Please log in again.'
+          : '비밀번호를 변경했어요. 다시 로그인해 주세요.');
+      Navigator.of(context).pop();
+    } else {
+      _showMessage(isEnglish
+          ? 'Password reset failed. Please check your recovery code.'
+          : '비밀번호 재설정에 실패했어요. 복구 코드를 확인해 주세요.');
     }
   }
 
-  void _showSuccess() {
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => AlertDialog(
-        title: Text(context.tr('완료', 'Done')),
-        content: Text(context.tr(
-          '비밀번호가 재설정되었습니다.\n다시 로그인해 주세요.',
-          'Password has been reset.\nPlease log in again.',
-        )),
-        actions: [
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              Navigator.of(context).pop();
-            },
-            child: Text(context.tr('로그인으로', 'Go to login')),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
-      children: [
-        _Header(verified: _codeEntered),
-        const SizedBox(height: 24),
-        if (!_codeEntered) _phase1() else _phase2(),
-      ],
-    );
-  }
+    final secondaryTextColor =
+        Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.68);
 
-  Widget _phase1() {
-    final exhausted = _attempts >= _maxAttempts;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(context.tr('아이디', 'Username'),
-            style:
-                AppTextStyles.labelMedium.copyWith(fontWeight: FontWeight.w700)),
-        const SizedBox(height: 8),
-        _RecoveryTextField(
-          controller: _idCtrl,
-          hintText: context.tr('아이디를 입력하세요', 'Enter your username'),
-          enabled: !exhausted,
-          onChanged: (_) => setState(() => _errorText = null),
-        ),
-        const SizedBox(height: 20),
-        Text(context.tr('복구 코드', 'Recovery Code'),
-            style:
-                AppTextStyles.labelMedium.copyWith(fontWeight: FontWeight.w700)),
-        const SizedBox(height: 8),
-        _RecoveryTextField(
-          controller: _codeCtrl,
-          hintText: context.tr('복구 코드를 입력하세요', 'Enter your recovery code'),
-          obscureText: _obscureCode,
-          enabled: !exhausted,
-          errorText: _errorText,
-          onChanged: (_) => setState(() => _errorText = null),
-          suffixIcon: IconButton(
-            icon: Icon(
-                _obscureCode ? Icons.visibility_off : Icons.visibility),
-            onPressed: () => setState(() => _obscureCode = !_obscureCode),
-          ),
-        ),
-        const SizedBox(height: 28),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: exhausted ? null : _proceedToNewPassword,
-            child: Text(context.tr('다음', 'Next')),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _phase2() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(context.tr('새 비밀번호', 'New Password'),
-            style:
-                AppTextStyles.labelMedium.copyWith(fontWeight: FontWeight.w700)),
-        const SizedBox(height: 8),
-        _RecoveryTextField(
-          controller: _pwCtrl,
-          hintText: context.tr('새 비밀번호를 입력하세요', 'Enter new password'),
-          obscureText: _obscurePw,
-          onChanged: (_) => setState(() => _errorText = null),
-          suffixIcon: IconButton(
-            icon: Icon(_obscurePw ? Icons.visibility_off : Icons.visibility),
-            onPressed: () => setState(() => _obscurePw = !_obscurePw),
-          ),
-        ),
-        const SizedBox(height: 20),
-        Text(context.tr('비밀번호 확인', 'Confirm Password'),
-            style:
-                AppTextStyles.labelMedium.copyWith(fontWeight: FontWeight.w700)),
-        const SizedBox(height: 8),
-        _RecoveryTextField(
-          controller: _confirmCtrl,
-          hintText: context.tr('비밀번호를 다시 입력하세요', 'Re-enter password'),
-          obscureText: _obscureConfirm,
-          errorText: _errorText,
-          onChanged: (_) => setState(() => _errorText = null),
-          suffixIcon: IconButton(
-            icon: Icon(
-                _obscureConfirm ? Icons.visibility_off : Icons.visibility),
-            onPressed: () =>
-                setState(() => _obscureConfirm = !_obscureConfirm),
-          ),
-        ),
-        const SizedBox(height: 28),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: _isLoading ? null : _resetPassword,
-            child: _isLoading
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white),
-                  )
-                : Text(context.tr('비밀번호 재설정', 'Reset Password')),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _Header extends StatelessWidget {
-  final bool verified;
-  const _Header({required this.verified});
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: AppColors.primaryContainer,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(
-              verified ? Icons.lock_open_rounded : Icons.lock_reset_rounded,
-              color: AppColors.primary,
-              size: 26,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  context.tr(
-                    verified ? '새 비밀번호 설정' : '비밀번호 재설정',
-                    verified ? 'Set New Password' : 'Reset Password',
-                  ),
-                  style: AppTextStyles.titleLarge
-                      .copyWith(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  context.tr(
-                    verified
-                        ? '새 비밀번호를 입력해 주세요.'
-                        : '아이디와 복구 코드를 입력하세요.',
-                    verified
-                        ? 'Enter your new password below.'
-                        : 'Enter your username and recovery code.',
-                  ),
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: colorScheme.onSurface.withValues(alpha: 0.68),
-                  ),
-                ),
-              ],
+          const SizedBox(height: 8),
+          Center(
+            child: Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: AppColors.primaryContainer,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(
+                Icons.lock_reset_rounded,
+                color: AppColors.primary,
+                size: 32,
+              ),
             ),
           ),
+          const SizedBox(height: 20),
+          Center(
+            child: Text(
+              context.tr('비밀번호 재설정', 'Reset Password'),
+              style: AppTextStyles.headlineSmall.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Center(
+            child: Text(
+              context.tr(
+                '아이디와 복구 코드로 본인을 확인한 후 새 비밀번호를 설정하세요.',
+                'Verify your identity with your ID and recovery code, then set a new password.',
+              ),
+              textAlign: TextAlign.center,
+              style: AppTextStyles.bodySmall.copyWith(
+                color: secondaryTextColor,
+                height: 1.45,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          const SizedBox(height: 28),
+          if (!_isVerified) ...[
+            Text(
+              context.tr('아이디', 'ID'),
+              style: AppTextStyles.labelLarge.copyWith(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _RecoveryTextField(
+              controller: _idController,
+              hintText: context.tr('아이디를 입력하세요', 'Enter your ID'),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              context.tr('복구 코드', 'Recovery Code'),
+              style: AppTextStyles.labelLarge.copyWith(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _RecoveryTextField(
+              controller: _recoveryCodeController,
+              hintText: context.tr(
+                '가입 시 설정한 복구 코드를 입력하세요',
+                'Enter the recovery code you set at sign-up',
+              ),
+            ),
+            const SizedBox(height: 28),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _submit,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  textStyle: AppTextStyles.titleMedium.copyWith(
+                    fontSize: 16,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                child: Text(context.tr('본인 확인', 'Verify Identity')),
+              ),
+            ),
+          ] else ...[
+            Text(
+              context.tr('새 비밀번호', 'New Password'),
+              style: AppTextStyles.labelLarge.copyWith(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _RecoveryTextField(
+              controller: _newPasswordController,
+              hintText: context.tr(
+                '새 비밀번호를 입력하세요',
+                'Enter your new password',
+              ),
+              obscureText: true,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              context.tr('새 비밀번호 확인', 'Confirm New Password'),
+              style: AppTextStyles.labelLarge.copyWith(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _RecoveryTextField(
+              controller: _confirmPasswordController,
+              hintText: context.tr(
+                '새 비밀번호를 다시 입력하세요',
+                'Enter your new password again',
+              ),
+              obscureText: true,
+            ),
+            const SizedBox(height: 28),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _isResetting ? null : _resetPassword,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  textStyle: AppTextStyles.titleMedium.copyWith(
+                    fontSize: 16,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                child: _isResetting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Text(context.tr('비밀번호 변경', 'Change Password')),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 }
+
+// ─── Shared TextField ─────────────────────────────────────────────────────────
 
 class _RecoveryTextField extends StatelessWidget {
-  final TextEditingController controller;
+  final TextEditingController? controller;
   final String hintText;
   final bool obscureText;
-  final bool enabled;
-  final String? errorText;
-  final ValueChanged<String>? onChanged;
-  final Widget? suffixIcon;
 
   const _RecoveryTextField({
-    required this.controller,
+    this.controller,
     required this.hintText,
     this.obscureText = false,
-    this.enabled = true,
-    this.errorText,
-    this.onChanged,
-    this.suffixIcon,
   });
 
   @override
@@ -350,12 +483,31 @@ class _RecoveryTextField extends StatelessWidget {
     return TextField(
       controller: controller,
       obscureText: obscureText,
-      enabled: enabled,
-      onChanged: onChanged,
+      style: AppTextStyles.bodyMedium.copyWith(
+        fontSize: 15,
+        color: Theme.of(context).colorScheme.onSurface,
+        fontWeight: FontWeight.w600,
+      ),
       decoration: InputDecoration(
         hintText: hintText,
-        errorText: errorText,
-        suffixIcon: suffixIcon,
+        hintStyle: AppTextStyles.bodyMedium.copyWith(
+          fontSize: 15,
+          color: Theme.of(context).hintColor,
+          fontWeight: FontWeight.w500,
+        ),
+        filled: true,
+        fillColor: Theme.of(context).inputDecorationTheme.fillColor,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide:
+              const BorderSide(color: AppColors.primary, width: 1.4),
+        ),
       ),
     );
   }
