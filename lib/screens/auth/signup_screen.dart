@@ -732,3 +732,230 @@ class _AgreementDivider extends StatelessWidget {
     );
   }
 }
+
+class _AgreementRow extends StatelessWidget {
+  final bool value;
+  final String label;
+  final String badge;
+  final ValueChanged<bool?> onChanged;
+
+  const _AgreementRow({
+    required this.value,
+    required this.label,
+    required this.badge,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: value
+              ? AppColors.primary.withValues(alpha: 0.22)
+              : colorScheme.outlineVariant.withValues(alpha: 0.55),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Transform.scale(
+            scale: 0.92,
+            child: Checkbox(
+              value: value,
+              onChanged: onChanged,
+              activeColor: AppColors.primary,
+              visualDensity: VisualDensity.compact,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+          ),
+          const SizedBox(width: 2),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontWeight: FontWeight.w600,
+                      height: 1.45,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: badge == '필수' || badge == 'Required'
+                          ? AppColors.primary.withValues(alpha: 0.1)
+                          : colorScheme.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      badge,
+                      style: AppTextStyles.labelSmall.copyWith(
+                        color: badge == '필수' || badge == 'Required'
+                            ? AppColors.primary
+                            : colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AgreementSection extends StatelessWidget {
+  final bool allChecked;
+  final Color secondaryTextColor;
+  final ValueChanged<bool> onToggleAll;
+  final List<Widget> children;
+
+  const _AgreementSection({
+    required this.allChecked,
+    required this.secondaryTextColor,
+    required this.onToggleAll,
+    required this.children,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      context.tr('약관 동의', 'Agreements'),
+                      style: AppTextStyles.titleMedium.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      context.tr(
+                        '모든 체크는 기본 해제되어 있어요. 필요한 항목을 직접 확인해 주세요.',
+                        'All checkboxes are off by default. Please review and select them yourself.',
+                      ),
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: secondaryTextColor,
+                        height: 1.45,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              GestureDetector(
+                onTap: () => onToggleAll(!allChecked),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: allChecked
+                        ? AppColors.primary.withValues(alpha: 0.1)
+                        : colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: allChecked
+                          ? AppColors.primary.withValues(alpha: 0.24)
+                          : colorScheme.outlineVariant.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: Text(
+                    context.tr('모든 약관 동의', 'Agree to all'),
+                    style: AppTextStyles.labelMedium.copyWith(
+                      color: allChecked
+                          ? AppColors.primary
+                          : colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ...children,
+        ],
+      ),
+    );
+  }
+}
+
+class _AgreementDivider extends StatelessWidget {
+  final String label;
+
+  const _AgreementDivider({
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Row(
+      children: [
+        Expanded(
+          child: Divider(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+            height: 1,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Text(
+            label,
+            style: AppTextStyles.labelMedium.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Divider(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+            height: 1,
+          ),
+        ),
+      ],
+    );
+  }
+}

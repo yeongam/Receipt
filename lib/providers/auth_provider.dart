@@ -152,6 +152,41 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<String?> findUsernameByRecovery({
+    required String name,
+    required String recoveryKeyword,
+  }) async {
+    try {
+      return await _repo.findUsernameByRecovery(
+        name: name,
+        recoveryKeyword: recoveryKeyword,
+      );
+    } catch (e) {
+      _errorMessage = e.toString();
+      _notifyIfActive();
+      return null;
+    }
+  }
+
+  Future<bool> resetPasswordWithRecovery({
+    required String username,
+    required String recoveryCode,
+    required String newPassword,
+  }) async {
+    _errorMessage = null;
+    try {
+      return await _repo.resetPasswordWithRecovery(
+        username: username,
+        recoveryCode: recoveryCode,
+        newPassword: newPassword,
+      );
+    } catch (e) {
+      _errorMessage = e.toString();
+      _notifyIfActive();
+      return false;
+    }
+  }
+
   Future<bool> signIn({required String username, required String password}) async {
     _errorMessage = null;
     _isSigningIn = true;
